@@ -877,7 +877,12 @@ function djb2(s) {
   return (h >>> 0).toString(16);
 }
 function getHash()    { return localStorage.getItem(PIN_HASH_KEY) || djb2('123456'); }
-function setHash(p)   { localStorage.setItem(PIN_HASH_KEY, djb2(p)); }
+function setHash(p)   {
+  const h = djb2(p);
+  localStorage.setItem(PIN_HASH_KEY, h);
+  // También guardarlo en Supabase para que aplique a todos los dispositivos
+  if(sbConfigured) sb.setConfig('pin_hash', h).catch(()=>{});
+}
 function verifyPin(p) { return djb2(p) === getHash(); }
 
 function isSessionValid() {
@@ -973,6 +978,10 @@ async function loadFromSupabase(){
 
     const banner = await sb.getConfig('banner');
     if(banner) db.banner = banner;
+
+    // PIN hash — se carga de Supabase para que sea igual en todos los dispositivos
+    const pinHash = await sb.getConfig('pin_hash');
+    if(pinHash) localStorage.setItem(PIN_HASH_KEY, pinHash);
 
     sbConfigured = true;
   } catch(e) {
