@@ -733,6 +733,9 @@ tr.dragging{opacity:.4;}
           <input class="form-input" id="f-img-url" type="text" placeholder="URL o link de Google Drive" style="flex:1;min-width:90px;" oninput="previewImgUrl()">
           <img id="img-preview" class="img-preview-thumb" style="display:none">
         </div>
+        <div style="font-size:.72rem;color:var(--tl);margin-top:.35rem;">
+          Para Google Drive: el archivo debe estar compartido como <strong>"Cualquier persona con el enlace"</strong>.
+        </div>
       </div>
       <div class="toggle-row">
         <span class="toggle-label">Disponible en stock</span>
@@ -819,8 +822,8 @@ tr.dragging{opacity:.4;}
 // ═══════════════════════════════════════════
 //  ⚙️  SUPABASE CONFIG — pegá tus credenciales aquí
 // ═══════════════════════════════════════════
-const SB_URL = 'https://keelsfvowejxdtyukdwm.supabase.co';   // ← reemplazá
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZWxzZnZvd2VqeGR0eXVrZHdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDQxMTMsImV4cCI6MjA5NDI4MDExM30.oCrJO0qyyS9MrXvrUsNUWN-ay5RZ4k0cCyWXYtsG8uo';                          // ← reemplazá
+const SB_URL = 'https://keelsfvowejxdtyukdwm.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZWxzZnZvd2VqeGR0eXVrZHdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDQxMTMsImV4cCI6MjA5NDI4MDExM30.oCrJO0qyyS9MrXvrUsNUWN-ay5RZ4k0cCyWXYtsG8uo';
 
 // ═══════════════════════════════════════════
 //  CONSTANTS (locales — no van a Supabase)
@@ -1865,28 +1868,27 @@ function confirmDelete(){
 //  IMAGES
 // ═══════════════════════════════════════════
 function triggerImgUpload(){document.getElementById('img-file-input').click();}
-// ─── Normaliza URLs de Google Drive y Google Fotos a links directos ───
+// ─── Normaliza URLs de Google Drive a links directos via proxy ───
+function extractDriveId(url){
+  const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(m1) return m1[1];
+  const m2 = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if(m2) return m2[1];
+  const m3 = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+  if(m3) return m3[1];
+  const m4 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m4 && url.includes('drive.google')) return m4[1];
+  return null;
+}
+
 function normalizeImgUrl(url){
   if(!url) return url;
-
-  // Google Drive — formatos posibles:
-  // https://drive.google.com/file/d/ID/view...
-  // https://drive.google.com/open?id=ID
-  // https://drive.google.com/uc?id=ID (ya está bien)
-  const driveFile = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if(driveFile) return `https://drive.google.com/uc?export=view&id=${driveFile[1]}`;
-
-  const driveOpen = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
-  if(driveOpen) return `https://drive.google.com/uc?export=view&id=${driveOpen[1]}`;
-
-  // Google Fotos — no tiene URL directa de imagen, redirige al viewer
-  // Intentamos extraer el ID y usar thumbnail de alta resolución
-  const photosMatch = url.match(/photos\.google\.com\/photo\/([a-zA-Z0-9_-]+)/);
-  if(photosMatch){
-    // Google Fotos no permite acceso directo — informamos al usuario
-    return url; // se devuelve igual, el onerror del img lo mostrará
+  const driveId = extractDriveId(url);
+  if(driveId){
+    // Usamos el thumbnail endpoint de Drive que no tiene restricciones CORS
+    // sz=s800 = hasta 800px de ancho, suficiente para el catálogo
+    return `https://drive.google.com/thumbnail?id=${driveId}&sz=s800`;
   }
-
   return url;
 }
 
