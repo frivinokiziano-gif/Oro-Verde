@@ -1868,7 +1868,7 @@ function confirmDelete(){
 //  IMAGES
 // ═══════════════════════════════════════════
 function triggerImgUpload(){document.getElementById('img-file-input').click();}
-// ─── Normaliza URLs de Google Drive a links directos via proxy ───
+// ─── Normaliza URLs de Google Drive a links directos ───
 function extractDriveId(url){
   const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
   if(m1) return m1[1];
@@ -1876,8 +1876,10 @@ function extractDriveId(url){
   if(m2) return m2[1];
   const m3 = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
   if(m3) return m3[1];
-  const m4 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if(m4 && url.includes('drive.google')) return m4[1];
+  const m4 = url.match(/drive\.google\.com\/thumbnail\?id=([a-zA-Z0-9_-]+)/);
+  if(m4) return m4[1];
+  const m5 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m5 && url.includes('drive.google')) return m5[1];
   return null;
 }
 
@@ -1885,9 +1887,8 @@ function normalizeImgUrl(url){
   if(!url) return url;
   const driveId = extractDriveId(url);
   if(driveId){
-    // Usamos el thumbnail endpoint de Drive que no tiene restricciones CORS
-    // sz=s800 = hasta 800px de ancho, suficiente para el catálogo
-    return `https://drive.google.com/thumbnail?id=${driveId}&sz=s800`;
+    // googleusercontent.com sirve la imagen sin restricciones CORS
+    return `https://lh3.googleusercontent.com/d/${driveId}`;
   }
   return url;
 }
