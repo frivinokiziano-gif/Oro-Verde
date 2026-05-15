@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Distribuidora Oro Verde</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -731,7 +730,7 @@ tr.dragging{opacity:.4;}
         <div class="img-upload-wrap">
           <button class="btn-upload" onclick="triggerImgUpload()">Subir archivo</button>
           <input type="file" id="img-file-input" accept="image/*" style="display:none" onchange="handleImgFile(this)">
-          <input class="form-input" id="f-img-url" type="text" placeholder="O pegar URL" style="flex:1;min-width:90px;" oninput="previewImgUrl()">
+          <input class="form-input" id="f-img-url" type="text" placeholder="URL o link de Google Drive" style="flex:1;min-width:90px;" oninput="previewImgUrl()">
           <img id="img-preview" class="img-preview-thumb" style="display:none">
         </div>
       </div>
@@ -1014,12 +1013,11 @@ async function loadFromSupabase(){
 }
 
 // ─── Save helpers ───
-async function saveProduct(p){
+async function saveProduct(p, skipReload=false){
   if(!sbConfigured){ localSave(); return; }
   try {
     await sb.upsert('products', productToRow(p));
-    // Immediate silent reload so all clients (including self) see the change
-    await loadFromSupabase();
+    if(!skipReload) await loadFromSupabase();
   } catch(e){ showToast('Error al guardar: '+e.message,'error'); }
 }
 async function deleteProductRemote(id){
@@ -1039,6 +1037,18 @@ async function saveConfig(key, value){
 function localSave(){
   localStorage.setItem('oroverde_data', JSON.stringify(db));
 }
+
+// Fix 3: pause polling when tab is hidden to save Supabase quota
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; }
+  } else {
+    if(sbConfigured && !_pollTimer){
+      loadFromSupabase();
+      _pollTimer = setInterval(()=>loadFromSupabase(), 15000);
+    }
+  }
+});
 function loadCart() { try{const r=localStorage.getItem(CART_KEY);return r?JSON.parse(r):[];}catch{return[];} }
 function saveCart() { localStorage.setItem(CART_KEY,JSON.stringify(cart)); }
 
@@ -1058,16 +1068,6 @@ function showPageLoader(show){
 
 
 
-function getDemoProducts() {
-  return [
-    {id:'p1',name:'Coca Cola 2L',      desc:'Gaseosa sabor cola 2 litros',  price:1200,category:'Bebidas', subcategory:'Gaseosas',emoji:'🥤',imgUrl:'',inStock:true, visible:true,tags:['oferta'],  order:0,priceHistory:[]},
-    {id:'p2',name:'Leche Entera 1L',   desc:'Leche larga vida entera',      price:650, category:'Lácteos', subcategory:'',        emoji:'🥛',imgUrl:'',inStock:true, visible:true,tags:['nuevo'],   order:1,priceHistory:[]},
-    {id:'p3',name:'Galletitas Oreo',   desc:'Pack x3 unidades',             price:980, category:'Snacks',  subcategory:'Dulces',  emoji:'🍪',imgUrl:'',inStock:false,visible:true,tags:[],          order:2,priceHistory:[]},
-    {id:'p4',name:'Agua Mineral 500ml',desc:'Agua sin gas',                 price:350, category:'Bebidas', subcategory:'Agua',    emoji:'💧',imgUrl:'',inStock:true, visible:true,tags:['sin TACC'], order:3,priceHistory:[]},
-    {id:'p5',name:'Detergente 500ml',  desc:'Limpieza de vajilla',          price:820, category:'Limpieza',subcategory:'',        emoji:'🧴',imgUrl:'',inStock:true, visible:true,tags:[],          order:4,priceHistory:[]},
-    {id:'p6',name:'Arroz 1kg',         desc:'Arroz blanco largo fino',      price:750, category:'Almacén', subcategory:'',        emoji:'🍚',imgUrl:'',inStock:true, visible:true,tags:[],          order:5,priceHistory:[]},
-  ];
-}
 
 // ═══════════════════════════════════════════
 //  VIEW SWITCHING
@@ -1695,7 +1695,8 @@ function applyBulkPrice(){
       p.price=val; count++; toSave.push(p);
     }
   });
-  Promise.all(toSave.map(p=>saveProduct(p)))
+  Promise.all(toSave.map(p=>saveProduct(p, true)))
+    .then(()=>loadFromSupabase())
     .then(()=>{ closeBulkModal(); clearSelection(); renderAdminTable(); renderStats();
       showToast('Precio actualizado en '+count+' producto'+(count!==1?'s':''),'success'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
@@ -1717,7 +1718,8 @@ function onDrop(e,targetId){
   const [moved]=db.products.splice(fromIdx,1);
   db.products.splice(toIdx,0,moved);
   db.products.forEach((p,i)=>p.order=i);
-  Promise.all(db.products.map(p=>saveProduct(p)))
+  Promise.all(db.products.map(p=>saveProduct(p, true)))
+    .then(()=>loadFromSupabase())
     .then(()=>{ renderAdminTable(); showToast('Orden actualizado'); })
     .catch(e=>showToast('Error al guardar orden: '+e.message,'error'));
 }
@@ -1759,7 +1761,7 @@ function submitProduct(){
     desc:        document.getElementById('f-desc').value.trim(),
     tags,
     emoji:       document.getElementById('f-emoji').value.trim()||'📦',
-    imgUrl:      document.getElementById('f-img-url').value.trim(),
+    imgUrl:      normalizeImgUrl(document.getElementById('f-img-url').value.trim()),
     inStock:     document.getElementById('f-stock').checked,
     visible:     document.getElementById('f-visible').checked,
   };
@@ -1863,6 +1865,31 @@ function confirmDelete(){
 //  IMAGES
 // ═══════════════════════════════════════════
 function triggerImgUpload(){document.getElementById('img-file-input').click();}
+// ─── Normaliza URLs de Google Drive y Google Fotos a links directos ───
+function normalizeImgUrl(url){
+  if(!url) return url;
+
+  // Google Drive — formatos posibles:
+  // https://drive.google.com/file/d/ID/view...
+  // https://drive.google.com/open?id=ID
+  // https://drive.google.com/uc?id=ID (ya está bien)
+  const driveFile = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(driveFile) return `https://drive.google.com/uc?export=view&id=${driveFile[1]}`;
+
+  const driveOpen = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if(driveOpen) return `https://drive.google.com/uc?export=view&id=${driveOpen[1]}`;
+
+  // Google Fotos — no tiene URL directa de imagen, redirige al viewer
+  // Intentamos extraer el ID y usar thumbnail de alta resolución
+  const photosMatch = url.match(/photos\.google\.com\/photo\/([a-zA-Z0-9_-]+)/);
+  if(photosMatch){
+    // Google Fotos no permite acceso directo — informamos al usuario
+    return url; // se devuelve igual, el onerror del img lo mostrará
+  }
+
+  return url;
+}
+
 function handleImgFile(inp){
   const file=inp.files[0]; if(!file) return;
   const r=new FileReader();
@@ -1870,7 +1897,10 @@ function handleImgFile(inp){
   r.readAsDataURL(file);
 }
 function previewImgUrl(){
-  const url=document.getElementById('f-img-url').value.trim();
+  const raw=document.getElementById('f-img-url').value.trim();
+  const url=normalizeImgUrl(raw);
+  // Si la URL fue convertida, actualizar el campo visualmente
+  if(url!==raw) document.getElementById('f-img-url').value=url;
   const prev=document.getElementById('img-preview');
   if(url){prev.src=url;prev.style.display='block';}else prev.style.display='none';
 }
