@@ -82,25 +82,28 @@ a{text-decoration:none;color:inherit;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
 
 /* Product Grid */
-.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;}
-.product-card{background:var(--white);border-radius:var(--rlg);overflow:hidden;box-shadow:var(--ssm);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;position:relative;}
-.product-card:hover{transform:translateY(-4px);box-shadow:var(--smd);}
-.product-card.out-of-stock .card-img-wrap::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(20,20,20,.52);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:1.05rem;font-weight:700;letter-spacing:.05em;}
+.product-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;}
+@media(min-width:480px){.product-grid{grid-template-columns:repeat(2,1fr);gap:.65rem;}}
+@media(min-width:700px){.product-grid{grid-template-columns:repeat(3,1fr);gap:.85rem;}}
+@media(min-width:1024px){.product-grid{grid-template-columns:repeat(4,1fr);gap:1rem;}}
+.product-card{background:var(--white);border-radius:var(--rmd);overflow:hidden;box-shadow:var(--ssm);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;position:relative;}
+.product-card:hover{transform:translateY(-3px);box-shadow:var(--smd);}
+.product-card.out-of-stock .card-img-wrap::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(20,20,20,.52);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:.85rem;font-weight:700;letter-spacing:.05em;}
 .card-img-wrap{position:relative;aspect-ratio:4/3;background:var(--creamd);overflow:hidden;}
 .card-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform .3s;}
 .product-card:hover .card-img-wrap img{transform:scale(1.04);}
-.card-emoji{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;}
-.card-stock-badge{position:absolute;top:9px;right:9px;padding:3px 9px;border-radius:99px;font-size:.68rem;font-weight:600;}
+.card-emoji{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;}
+.card-stock-badge{position:absolute;top:5px;right:5px;padding:2px 6px;border-radius:99px;font-size:.6rem;font-weight:600;}
 .badge-avail{background:var(--gl);color:var(--gd);}
 .badge-out{background:var(--redbg);color:var(--red);}
-.card-body{padding:.85rem 1rem .5rem;flex:1;display:flex;flex-direction:column;gap:.25rem;}
-.card-cat{font-size:.68rem;color:var(--gb);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
-.card-name{font-family:'Fraunces',serif;font-size:1rem;font-weight:700;color:var(--td);line-height:1.2;}
-.card-desc{font-size:.78rem;color:var(--tl);line-height:1.5;flex:1;}
-.card-tags{margin-top:.25rem;}
-.card-price{font-family:'Fraunces',serif;font-size:1.25rem;font-weight:700;color:var(--gd);margin-top:.2rem;}
-.card-footer{padding:.5rem 1rem .9rem;display:flex;gap:.5rem;}
-.btn-add-cart{flex:1;padding:9px;border-radius:var(--rmd);background:var(--gd);color:var(--white);font-size:.83rem;font-weight:600;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.card-body{padding:.55rem .65rem .35rem;flex:1;display:flex;flex-direction:column;gap:.18rem;}
+.card-cat{font-size:.6rem;color:var(--gb);text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+.card-name{font-family:'Fraunces',serif;font-size:.85rem;font-weight:700;color:var(--td);line-height:1.2;}
+.card-desc{font-size:.7rem;color:var(--tl);line-height:1.4;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.card-tags{margin-top:.15rem;}
+.card-price{font-family:'Fraunces',serif;font-size:1rem;font-weight:700;color:var(--gd);margin-top:.1rem;}
+.card-footer{padding:.3rem .65rem .6rem;display:flex;gap:.35rem;}
+.btn-add-cart{flex:1;padding:6px 5px;border-radius:var(--rsm);background:var(--gd);color:var(--white);font-size:.72rem;font-weight:600;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:3px;}
 .btn-add-cart:hover:not(:disabled){background:var(--gm);}
 .btn-add-cart:active{transform:scale(.97);}
 .btn-add-cart:disabled{background:var(--creamd);color:var(--tl);cursor:not-allowed;}
@@ -117,6 +120,14 @@ a{text-decoration:none;color:inherit;}
 .related-chips{display:flex;gap:.4rem;flex-wrap:wrap;}
 .related-chip{padding:4px 10px;border-radius:99px;background:var(--creamd);font-size:.72rem;font-weight:500;color:var(--gd);cursor:pointer;transition:background .12s;}
 .related-chip:hover{background:var(--gl);}
+
+/* Pagination */
+.pagination{display:flex;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem 0 .5rem;flex-wrap:wrap;}
+.page-btn{padding:7px 13px;border-radius:var(--rmd);border:1.5px solid var(--creamd);background:var(--white);font-size:.82rem;font-weight:600;color:var(--tm);cursor:pointer;transition:all .15s;}
+.page-btn:hover:not(:disabled){border-color:var(--gm);color:var(--gm);}
+.page-btn.active{background:var(--gd);color:var(--white);border-color:var(--gd);}
+.page-btn:disabled{opacity:.35;cursor:not-allowed;}
+.page-info{font-size:.78rem;color:var(--tl);padding:0 .25rem;}
 
 /* Empty */
 .empty-state{text-align:center;padding:3.5rem 1rem;color:var(--tl);}
@@ -568,9 +579,9 @@ tr.dragging{opacity:.4;}
     <div class="search-row">
       <div class="search-input-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-input" type="text" id="search-input" placeholder="Buscar productos..." oninput="renderCatalog()">
+        <input class="search-input" type="text" id="search-input" placeholder="Buscar productos..." oninput="currentPage=1;renderCatalog()">
       </div>
-      <select class="filter-select" id="stock-filter" onchange="renderCatalog()">
+      <select class="filter-select" id="stock-filter" onchange="currentPage=1;renderCatalog()">
         <option value="all">Todo el stock</option>
         <option value="avail">Disponibles</option>
         <option value="out">Agotados</option>
@@ -584,6 +595,7 @@ tr.dragging{opacity:.4;}
 <!-- Catalog View -->
 <div class="view active" id="view-catalog">
   <div class="product-grid" id="product-grid"></div>
+  <div class="pagination" id="pagination" style="display:none"></div>
   <div class="empty-state" id="empty-catalog" style="display:none">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
     <p>No se encontraron productos</p>
@@ -848,6 +860,28 @@ const sb = {
     if(!r.ok) throw new Error(await r.text());
     return r.json();
   },
+  // Fetch a specific page of products with server-side filters
+  async selectPage(table, qs='', page=1, pageSize=40){
+    const from=(page-1)*pageSize;
+    const to=from+pageSize-1;
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{
+      headers:this._h({'Prefer':'return=representation','Range-Unit':'items','Range':`${from}-${to}`,'Prefer':'count=exact'})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const data=await r.json();
+    const contentRange=r.headers.get('Content-Range')||'';
+    const total=parseInt(contentRange.split('/')[1])||data.length;
+    return {data, total};
+  },
+  // Fetch only the total count (very lightweight — used by polling)
+  async count(table, qs=''){
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}&select=id`,{
+      headers:this._h({'Prefer':'count=exact','Range':'0-0'})
+    });
+    if(!r.ok) return null;
+    const contentRange=r.headers.get('Content-Range')||'';
+    return parseInt(contentRange.split('/')[1]) ?? null;
+  },
   async upsert(table, data){
     const r=await fetch(`${SB_URL}/rest/v1/${table}`,{
       method:'POST', headers:this._h({'Prefer':'resolution=merge-duplicates,return=representation'}),
@@ -915,6 +949,8 @@ let isAdmin        = isSessionValid();
 let currentView    = 'catalog';
 let activeCategory  = 'all';
 let activeSub       = 'all';
+let currentPage     = 1;
+const PAGE_SIZE     = 40;
 let pendingDeleteId = null;
 let pinBuffer      = '';
 let lockoutTimer   = null;
@@ -970,21 +1006,28 @@ function productToRow(p){
 let _pollTimer = null;
 let _firstLoad  = true;
 
-async function loadFromSupabase(){
+let _totalProducts = 0; // total count known from server
+
+async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
   try {
-    const rows = await sb.select('products','order=sort_order.asc');
-    db.products = rows.map(rowToProduct);
+    if(fullReload){
+      // Full config load (categories, banner, PIN) — done on first load and after writes
+      const [cats, banner, pinHash] = await Promise.all([
+        sb.getConfig('categories'),
+        sb.getConfig('banner'),
+        sb.getConfig('pin_hash'),
+      ]);
+      if(cats)     db.categories = cats;
+      if(banner)   db.banner     = banner;
+      if(pinHash)  localStorage.setItem(PIN_HASH_KEY, pinHash);
+    }
 
-    const cats = await sb.getConfig('categories');
-    if(cats) db.categories = cats;
-
-    const banner = await sb.getConfig('banner');
-    if(banner) db.banner = banner;
-
-    // PIN hash — se carga de Supabase para que sea igual en todos los dispositivos
-    const pinHash = await sb.getConfig('pin_hash');
-    if(pinHash) localStorage.setItem(PIN_HASH_KEY, pinHash);
+    // Always load products for current page + all visible products for cart sync
+    const qs = 'order=sort_order.asc';
+    const {data, total} = await sb.selectPage('products', qs, currentPage, PAGE_SIZE);
+    db.products = data.map(rowToProduct);
+    _totalProducts = total;
 
     sbConfigured = true;
   } catch(e) {
@@ -1003,15 +1046,25 @@ async function loadFromSupabase(){
     updateBadge();
     if(isAdmin) renderAdmin();
   } else {
-    // Silent refresh — don't interrupt the user, just update data
     renderCatalog();
     applyBanner();
     if(currentView==='admin') renderAdminTable();
   }
 
-  // Start polling every 15 seconds (only once)
+  // Polling: every 15s only check the count — reload page only if something changed
   if(!_pollTimer && sbConfigured){
-    _pollTimer = setInterval(()=>loadFromSupabase(), 15000);
+    _pollTimer = setInterval(async ()=>{
+      try {
+        const newCount = await sb.count('products', 'order=sort_order.asc');
+        if(newCount !== null && newCount !== _totalProducts){
+          // Something was added/deleted — do a full reload of current page
+          await loadFromSupabase(false);
+        } else {
+          // Same count — still check for price/stock changes silently
+          await loadFromSupabase(false);
+        }
+      } catch{}
+    }, 15000);
   }
 }
 
@@ -1047,8 +1100,13 @@ document.addEventListener('visibilitychange', () => {
     if(_pollTimer){ clearInterval(_pollTimer); _pollTimer=null; }
   } else {
     if(sbConfigured && !_pollTimer){
-      loadFromSupabase();
-      _pollTimer = setInterval(()=>loadFromSupabase(), 15000);
+      loadFromSupabase(false);
+      _pollTimer = setInterval(async ()=>{
+        try {
+          const newCount = await sb.count('products','order=sort_order.asc');
+          if(newCount !== null) await loadFromSupabase(false);
+        } catch{}
+      }, 15000);
     }
   }
 });
@@ -1237,6 +1295,7 @@ function renderCatalog(){
   const stock=document.getElementById('stock-filter').value;
   const grid=document.getElementById('product-grid');
   const empty=document.getElementById('empty-catalog');
+  const paginationEl=document.getElementById('pagination');
 
   let prods=db.products.filter(p=>p.visible!==false);
   if(activeCategory!=='all') prods=prods.filter(p=>p.category===activeCategory);
@@ -1252,22 +1311,45 @@ function renderCatalog(){
   );
   prods.sort((a,b)=>(a.order??99)-(b.order??99));
 
-  if(!prods.length){grid.innerHTML='';empty.style.display='block';return;}
+  if(!prods.length){
+    grid.innerHTML=''; empty.style.display='block'; paginationEl.style.display='none'; return;
+  }
   empty.style.display='none';
 
-  grid.innerHTML=prods.map(p=>{
+  // Use server total for pagination when Supabase is active
+  // prods here is already the current page slice from Supabase
+  const serverTotal = sbConfigured ? _totalProducts : prods.length;
+  const totalPages  = Math.ceil(serverTotal / PAGE_SIZE);
+  const start       = (currentPage-1)*PAGE_SIZE;
+  // When using Supabase pagination, prods IS already the page slice
+  const paginated   = sbConfigured ? prods : prods.slice(start, start+PAGE_SIZE);
+
+  // Pre-build related map once (avoid N² filter for 1000 products)
+  const relatedMap=new Map();
+  if(db.products.length < 500){
+    db.products.filter(x=>x.visible!==false&&x.inStock).forEach(x=>{
+      if(!relatedMap.has(x.category)) relatedMap.set(x.category,[]);
+      relatedMap.get(x.category).push(x);
+    });
+  }
+
+  grid.innerHTML=paginated.map(p=>{
     const imgHtml=p.imgUrl
       ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'📦'}</div>`
       :`<div class="card-emoji">${p.emoji||'📦'}</div>`;
     const ci=cart.find(c=>c.id===p.id); const qty=ci?ci.qty:0;
     const tagsHtml=renderTagChips(p.tags||[]);
-    // Related products: same category, different product, max 3
-    const related=db.products.filter(x=>x.id!==p.id&&x.category===p.category&&x.visible!==false&&x.inStock).slice(0,3);
-    const relatedHtml=related.length?`<div class="related-section"><div class="related-title">También te puede interesar</div><div class="related-chips">${related.map(r=>`<span class="related-chip" onclick="scrollToProduct('${r.id}')">${esc(r.name)}</span>`).join('')}</div></div>`:'';
+
+    // Related: only show when product count < 500 to avoid slowdown
+    let relatedHtml='';
+    if(relatedMap.size){
+      const related=(relatedMap.get(p.category)||[]).filter(x=>x.id!==p.id).slice(0,3);
+      if(related.length) relatedHtml=`<div class="related-section"><div class="related-title">También te puede interesar</div><div class="related-chips">${related.map(r=>`<span class="related-chip" onclick="scrollToProduct('${r.id}')">${esc(r.name)}</span>`).join('')}</div></div>`;
+    }
 
     return `<div class="product-card${p.inStock?'':' out-of-stock'}" id="card-${p.id}">
       <div class="card-img-wrap">${imgHtml}
-        <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'Disponible':'Agotado'}</span>
+        <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'✓':'✗'}</span>
       </div>
       <div class="card-body">
         ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` › ${esc(p.subcategory)}`:''}</div>`:''}
@@ -1279,22 +1361,48 @@ function renderCatalog(){
       ${relatedHtml}
       <div class="card-footer">
         ${qty>0
-          ?`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.5rem;">
+          ?`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
               <button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button>
               <input type="number" class="qty-val" value="${qty}" min="1"
                 onchange="setQty('${p.id}',this.value)"
-                onclick="this.select()">
+                onfocus="this.select()">
               <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
               <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">✕</button>
             </div>`
           :`<button class="btn-add-cart" onclick="addToCart('${p.id}')" ${p.inStock?'':'disabled'}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
               ${p.inStock?'Agregar':'Agotado'}
             </button>`
         }
       </div>
     </div>`;
   }).join('');
+
+  // Render pagination controls
+  if(totalPages<=1){ paginationEl.style.display='none'; return; }
+  paginationEl.style.display='flex';
+  let pages='';
+  // Prev button
+  pages+=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  // Page numbers — show max 5 around current
+  const range=2;
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||Math.abs(i-currentPage)<=range){
+      pages+=`<button class="page-btn${i===currentPage?' active':''}" onclick="goPage(${i})">${i}</button>`;
+    } else if(Math.abs(i-currentPage)===range+1){
+      pages+=`<span class="page-info">…</span>`;
+    }
+  }
+  // Next button
+  pages+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+  pages+=`<span class="page-info">${start+1}2013${Math.min(start+PAGE_SIZE,serverTotal)} de ${serverTotal}</span>`;
+  paginationEl.innerHTML=pages;
+}
+
+function goPage(n){
+  currentPage=n;
+  loadFromSupabase(false); // fetch new page from Supabase
+  document.getElementById('view-catalog').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function renderTagChips(tags){
@@ -1332,10 +1440,10 @@ function renderFilterChips(){
     ).join('');
 }
 function setCategory(c){
-  activeCategory=c; activeSub='all'; renderCatalog();
+  activeCategory=c; activeSub='all'; currentPage=1; renderCatalog();
 }
 function setSubcat(s){
-  activeSub=s; renderCatalog();
+  activeSub=s; currentPage=1; renderCatalog();
 }
 
 // ═══════════════════════════════════════════
