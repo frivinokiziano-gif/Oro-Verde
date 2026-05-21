@@ -1717,7 +1717,9 @@ function renderCatChips(){
 }
 
 function renderCategorySelect(){
-  const sel=document.getElementById('f-category'),cur=sel.value;
+  const sel=document.getElementById('f-category');
+  if(!sel) return; // form panel may not be visible yet
+  const cur=sel.value;
   const selSub=document.getElementById('f-subcategory');
   const curSub=selSub?selSub.value:'';
   sel.innerHTML='<option value="">Sin categoría</option>'+
