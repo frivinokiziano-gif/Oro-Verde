@@ -670,9 +670,10 @@ tr.dragging{opacity:.4;}
       <div class="table-header">
         <div style="font-family:'Fraunces',serif;font-size:.95rem;font-weight:700;color:var(--gd);">Productos</div>
         <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;">
+          <div id="admin-cat-filter-wrap"></div>
           <div class="table-search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input class="table-search" type="text" id="admin-search" placeholder="Buscar..." oninput="renderAdminTable()">
+            <input class="table-search" type="text" id="admin-search" placeholder="Buscar en todos los productos..." oninput="renderAdminTable()">
           </div>
           <div class="table-count" id="table-count"></div>
         </div>
@@ -690,6 +691,8 @@ tr.dragging{opacity:.4;}
         <tbody id="admin-tbody"></tbody>
       </table>
       <div class="empty-state" id="empty-admin" style="display:none;padding:1.5rem 0;"><p>No hay productos aún</p></div>
+      <input type="hidden" id="admin-page-input" value="1">
+      <div class="pagination" id="admin-pagination" style="display:none;margin-top:.75rem;"></div>
     </div>
     <div class="qr-section">
       <div style="font-family:'Fraunces',serif;font-size:.95rem;font-weight:700;color:var(--gd);">Código QR del catálogo</div>
@@ -1006,35 +1009,46 @@ function productToRow(p){
 let _pollTimer = null;
 let _firstLoad  = true;
 
-let _totalProducts = 0; // total count known from server
+let _totalProducts = 0;
+let _allProducts   = []; // full list — used by admin table, search, stats
 
 async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
   try {
     if(fullReload){
-      // Full config load (categories, banner, PIN) — done on first load and after writes
       const [cats, banner, pinHash] = await Promise.all([
         sb.getConfig('categories'),
         sb.getConfig('banner'),
         sb.getConfig('pin_hash'),
       ]);
-      if(cats)     db.categories = cats;
-      if(banner)   db.banner     = banner;
-      if(pinHash)  localStorage.setItem(PIN_HASH_KEY, pinHash);
+      if(cats)    db.categories = cats;
+      if(banner)  db.banner     = banner;
+      if(pinHash) localStorage.setItem(PIN_HASH_KEY, pinHash);
+
+      // Load ALL products once for admin (stats, table, search)
+      const allRows = await sb.select('products','order=sort_order.asc');
+      _allProducts   = allRows.map(rowToProduct);
+      _totalProducts = _allProducts.length;
     }
 
-    // Always load products for current page + all visible products for cart sync
+    // Load current catalog page (40 products) for display
     const qs = 'order=sort_order.asc';
-    const {data, total} = await sb.selectPage('products', qs, currentPage, PAGE_SIZE);
+    const {data} = await sb.selectPage('products', qs, currentPage, PAGE_SIZE);
     db.products = data.map(rowToProduct);
-    _totalProducts = total;
 
     sbConfigured = true;
   } catch(e) {
     console.warn('Supabase no configurado o sin conexión, usando datos locales.',e);
     try {
       const raw=localStorage.getItem('oroverde_data');
-      if(raw){ const d=JSON.parse(raw); db.products=d.products||[]; if(d.categories) db.categories=d.categories; if(d.banner) db.banner=d.banner; }
+      if(raw){
+        const d=JSON.parse(raw);
+        db.products  = d.products||[];
+        _allProducts = d.products||[];
+        _totalProducts = _allProducts.length;
+        if(d.categories) db.categories=d.categories;
+        if(d.banner)     db.banner=d.banner;
+      }
     } catch{}
   }
 
@@ -1051,17 +1065,19 @@ async function loadFromSupabase(fullReload=true){
     if(currentView==='admin') renderAdminTable();
   }
 
-  // Polling: every 15s only check the count — reload page only if something changed
   if(!_pollTimer && sbConfigured){
     _pollTimer = setInterval(async ()=>{
       try {
-        const newCount = await sb.count('products', 'order=sort_order.asc');
+        const newCount = await sb.count('products','order=sort_order.asc');
         if(newCount !== null && newCount !== _totalProducts){
-          // Something was added/deleted — do a full reload of current page
-          await loadFromSupabase(false);
+          await loadFromSupabase(true); // full reload if count changed
         } else {
-          // Same count — still check for price/stock changes silently
-          await loadFromSupabase(false);
+          // Silently refresh current catalog page only
+          const qs='order=sort_order.asc';
+          const {data} = await sb.selectPage('products',qs,currentPage,PAGE_SIZE);
+          db.products = data.map(rowToProduct);
+          renderCatalog();
+          if(currentView==='admin') renderAdminTable();
         }
       } catch{}
     }, 15000);
@@ -1073,21 +1089,21 @@ async function saveProduct(p, skipReload=false){
   if(!sbConfigured){ localSave(); return; }
   try {
     await sb.upsert('products', productToRow(p));
-    if(!skipReload) await loadFromSupabase();
+    if(!skipReload) await loadFromSupabase(true);
   } catch(e){ showToast('Error al guardar: '+e.message,'error'); }
 }
 async function deleteProductRemote(id){
   if(!sbConfigured){ localSave(); return; }
   try {
     await sb.delete('products', id);
-    await loadFromSupabase();
+    await loadFromSupabase(true);
   } catch(e){ showToast('Error al eliminar: '+e.message,'error'); }
 }
 async function saveConfig(key, value){
   if(!sbConfigured){ localSave(); return; }
   try {
     await sb.setConfig(key, value);
-    await loadFromSupabase();
+    await loadFromSupabase(true);
   } catch(e){ showToast('Error al guardar config: '+e.message,'error'); }
 }
 function localSave(){
@@ -1326,8 +1342,9 @@ function renderCatalog(){
 
   // Pre-build related map once (avoid N² filter for 1000 products)
   const relatedMap=new Map();
-  if(db.products.length < 500){
-    db.products.filter(x=>x.visible!==false&&x.inStock).forEach(x=>{
+  const _catSrc=_allProducts.length>0?_allProducts:db.products;
+  if(_catSrc.length < 500){
+    _catSrc.filter(x=>x.visible!==false&&x.inStock).forEach(x=>{
       if(!relatedMap.has(x.category)) relatedMap.set(x.category,[]);
       relatedMap.get(x.category).push(x);
     });
@@ -1450,7 +1467,8 @@ function setSubcat(s){
 //  CART
 // ═══════════════════════════════════════════
 function addToCart(id){
-  const p=db.products.find(x=>x.id===id); if(!p||!p.inStock) return;
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id); if(!p||!p.inStock) return;
   const ex=cart.find(x=>x.id===id);
   if(ex) ex.qty++; else cart.push({id,qty:1});
   saveCart(); updateBadge(); renderCatalog(); showToast(p.name+' agregado');
@@ -1492,7 +1510,8 @@ function renderCart(){
   empty.style.display='none'; notesWrap.style.display='block';
   let total=0,rowsHtml='';
   list.innerHTML=cart.map(item=>{
-    const p=db.products.find(x=>x.id===item.id); if(!p) return '';
+    const _pool2=_allProducts.length>0?_allProducts:db.products;
+    const p=_pool2.find(x=>x.id===item.id); if(!p) return '';
     const sub=p.price*item.qty; total+=sub;
     rowsHtml+=`<div class="summary-row"><span>${esc(p.name)} x${item.qty}</span><span>$${fmt(sub)}</span></div>`;
     const imgHtml=p.imgUrl
@@ -1522,11 +1541,9 @@ function renderCart(){
 // Texto limpio para copiar — sin aviso
 function buildOrderText(){
   const lines=['PEDIDO - Distribuidora Oro Verde',''];
-  cart.forEach(item=>{
-    const p=db.products.find(x=>x.id===item.id);
-    if(p) lines.push(item.qty+'x '+p.name+'   $'+fmt(p.price*item.qty));
-  });
-  const total=cart.reduce((s,x)=>{const p=db.products.find(q=>q.id===x.id);return s+(p?p.price*x.qty:0);},0);
+  const _pool3=_allProducts.length>0?_allProducts:db.products;
+  cart.forEach(item=>{const p=_pool3.find(x=>x.id===item.id);if(p)lines.push(item.qty+'x '+p.name+'   $'+fmt(p.price*item.qty));});
+  const total=cart.reduce((s,x)=>{const p=_pool3.find(q=>q.id===x.id);return s+(p?p.price*x.qty:0);},0);
   const notes=(document.getElementById('cart-notes').value||'').trim();
   lines.push('');
   lines.push('Total estimado: $'+fmt(total));
@@ -1570,15 +1587,39 @@ function switchAdminTab(tab){
 }
 
 function renderStats(){
-  const t=db.products.length,av=db.products.filter(p=>p.inStock&&p.visible!==false).length,
-        ou=db.products.filter(p=>!p.inStock).length,hi=db.products.filter(p=>p.visible===false).length,
+  const src=_allProducts.length>0?_allProducts:db.products;
+  const t=src.length,av=src.filter(p=>p.inStock&&p.visible!==false).length,
+        ou=src.filter(p=>!p.inStock).length,hi=src.filter(p=>p.visible===false).length,
         ca=db.categories.length;
   document.getElementById('stats-grid').innerHTML=
     [{n:t,l:'Productos'},{n:av,l:'Disponibles'},{n:ou,l:'Agotados'},{n:hi,l:'Ocultos'},{n:ca,l:'Categorías'}]
     .map(s=>`<div class="stat-card"><div class="stat-num">${s.n}</div><div class="stat-label">${s.l}</div></div>`).join('');
 }
 
-function getCatNames(){ return db.categories.map(c=>c.name||c); }
+function renderAdminPagination(total, page, totalPages){
+  const el = document.getElementById('admin-pagination');
+  if(!el) return;
+  if(totalPages<=1){ el.style.display='none'; return; }
+  el.style.display='flex';
+  let html = '';
+  html += `<button class="page-btn" onclick="adminGoPage(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+  const range=2;
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||Math.abs(i-page)<=range)
+      html+=`<button class="page-btn${i===page?' active':''}" onclick="adminGoPage(${i})">${i}</button>`;
+    else if(Math.abs(i-page)===range+1)
+      html+=`<span class="page-info">…</span>`;
+  }
+  html += `<button class="page-btn" onclick="adminGoPage(${page+1})" ${page===totalPages?'disabled':''}>›</button>`;
+  html += `<span class="page-info">${(page-1)*50+1}–${Math.min(page*50,total)} de ${total}</span>`;
+  el.innerHTML = html;
+}
+function adminGoPage(n){
+  const inp = document.getElementById('admin-page-input');
+  if(inp) inp.value = n;
+  renderAdminTable();
+  document.getElementById('admin-tbody').closest('.admin-table-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
 function getCatObj(name){ return db.categories.find(c=>(c.name||c)===name); }
 
 function renderCatChips(){
@@ -1642,8 +1683,9 @@ function addCategory(){
 
 function deleteCategory(cat){
   db.categories=db.categories.filter(c=>(c.name||c)!==cat);
-  const affected=db.products.filter(p=>p.category===cat);
+  const affected=(_allProducts.length>0?_allProducts:db.products).filter(p=>p.category===cat);
   affected.forEach(p=>{p.category='';p.subcategory='';});
+  db.products.forEach(p=>{if(p.category===cat){p.category='';p.subcategory='';}});
   Promise.all([saveConfig('categories',db.categories),...affected.map(p=>saveProduct(p))])
     .then(()=>{ renderCatChips(); renderCategorySelect(); renderAdminTable(); renderFilterChips(); renderStats(); renderCatalog(); showToast('Categoría eliminada'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
@@ -1664,30 +1706,61 @@ function addSubcat(catName){
 function deleteSubcat(catName,sub){
   const catObj=getCatObj(catName); if(!catObj||!catObj.subs) return;
   catObj.subs=catObj.subs.filter(s=>s!==sub);
-  const affected=db.products.filter(p=>p.category===catName&&p.subcategory===sub);
+  const affected=(_allProducts.length>0?_allProducts:db.products).filter(p=>p.category===catName&&p.subcategory===sub);
   affected.forEach(p=>p.subcategory='');
+  db.products.forEach(p=>{if(p.category===catName&&p.subcategory===sub)p.subcategory='';});
   Promise.all([saveConfig('categories',db.categories),...affected.map(p=>saveProduct(p))])
     .then(()=>{ renderCatChips(); renderCategorySelect(); renderFilterChips(); renderAdminTable(); renderCatalog(); showToast('Subcategoría eliminada'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
 
 function renderAdminTable(){
-  const tbody=document.getElementById('admin-tbody');
-  const empty=document.getElementById('empty-admin');
-  const query=(document.getElementById('admin-search').value||'').toLowerCase().trim();
+  const tbody = document.getElementById('admin-tbody');
+  const empty = document.getElementById('empty-admin');
+  const query = (document.getElementById('admin-search').value||'').toLowerCase().trim();
 
-  let prods=[...db.products].sort((a,b)=>(a.order??99)-(b.order??99));
-  if(query) prods=prods.filter(p=>
+  // Use _allProducts (full list) so search and filters work across all products
+  const source = (_allProducts.length > 0 ? _allProducts : db.products);
+  let prods = [...source].sort((a,b)=>(a.order??99)-(b.order??99));
+
+  if(query) prods = prods.filter(p=>
     p.name.toLowerCase().includes(query)||
     (p.category||'').toLowerCase().includes(query)||
+    (p.subcategory||'').toLowerCase().includes(query)||
     (p.tags||[]).some(t=>t.toLowerCase().includes(query))
   );
 
-  document.getElementById('table-count').textContent=prods.length+' de '+db.products.length+' producto'+(db.products.length!==1?'s':'');
-  if(!prods.length){tbody.innerHTML='';empty.style.display='block';return;}
-  empty.style.display='none';
+  // Admin category filter
+  const adminCatFilter = document.getElementById('admin-cat-filter');
+  const selectedCat = adminCatFilter ? adminCatFilter.value : '';
+  if(selectedCat) prods = prods.filter(p=>p.category===selectedCat);
 
-  tbody.innerHTML=prods.map(p=>{
+  // Admin pagination
+  const ADMIN_PAGE_SIZE = 50;
+  let adminPage = parseInt(document.getElementById('admin-page-input')?.value||1)||1;
+  const totalAdminPages = Math.max(1, Math.ceil(prods.length / ADMIN_PAGE_SIZE));
+  if(adminPage > totalAdminPages) adminPage = totalAdminPages;
+  const adminStart = (adminPage-1)*ADMIN_PAGE_SIZE;
+  const prodsPage  = prods.slice(adminStart, adminStart+ADMIN_PAGE_SIZE);
+
+  document.getElementById('table-count').textContent =
+    `${prods.length} de ${source.length} producto${source.length!==1?'s':''}`;
+
+  // Render category filter dropdown
+  const catFilterWrap = document.getElementById('admin-cat-filter-wrap');
+  if(catFilterWrap){
+    const cats = getCatNames();
+    catFilterWrap.innerHTML = `<select id="admin-cat-filter" onchange="renderAdminTable()" style="padding:6px 9px;border-radius:var(--rsm);border:1.5px solid var(--creamd);background:var(--cream);font-size:.8rem;">
+      <option value="">Todas las categorías</option>
+      ${cats.map(c=>`<option value="${escA(c)}"${c===selectedCat?' selected':''}>${esc(c)}</option>`).join('')}
+    </select>`;
+  }
+
+  if(!prodsPage.length){ tbody.innerHTML=''; empty.style.display='block'; renderAdminPagination(0,1,1); return; }
+  empty.style.display='none';
+  renderAdminPagination(prods.length, adminPage, totalAdminPages);
+
+  tbody.innerHTML=prodsPage.map(p=>{
     const imgHtml=p.imgUrl
       ?`<img src="${esc(p.imgUrl)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="td-img-emoji" style="display:none">${p.emoji||'📦'}</div>`
       :`<div class="td-img-emoji">${p.emoji||'📦'}</div>`;
@@ -1784,7 +1857,7 @@ function clearSelection(){
 }
 function openBulkModal(){
   if(!selectedIds.size) return;
-  const names=db.products.filter(p=>selectedIds.has(p.id)).map(p=>p.name);
+  const names=(_allProducts.length>0?_allProducts:db.products).filter(p=>selectedIds.has(p.id)).map(p=>p.name);
   document.getElementById('bulk-desc').textContent=
     'Se cambiará el precio de: '+names.join(', ')+'.';
   document.getElementById('bulk-price-input').value='';
@@ -1799,7 +1872,7 @@ function applyBulkPrice(){
   if(isNaN(val)||val<0){showToast('Precio inválido','error');return;}
   let count=0;
   const toSave=[];
-  db.products.forEach(p=>{
+  (_allProducts.length>0?_allProducts:db.products).forEach(p=>{
     if(selectedIds.has(p.id)){
       if(!p.priceHistory) p.priceHistory=[];
       if(p.price!==val) p.priceHistory.push({price:p.price,date:new Date().toISOString()});
@@ -1823,13 +1896,15 @@ function onDragEnd(){ document.querySelectorAll('#admin-tbody tr').forEach(r=>r.
 function onDrop(e,targetId){
   e.preventDefault(); e.currentTarget.classList.remove('drag-over');
   if(!dragId||dragId===targetId) return;
-  const fromIdx=db.products.findIndex(p=>p.id===dragId);
-  const toIdx  =db.products.findIndex(p=>p.id===targetId);
+  const _src=_allProducts.length>0?_allProducts:db.products;
+  const fromIdx=_src.findIndex(p=>p.id===dragId);
+  const toIdx  =_src.findIndex(p=>p.id===targetId);
   if(fromIdx<0||toIdx<0) return;
-  const [moved]=db.products.splice(fromIdx,1);
-  db.products.splice(toIdx,0,moved);
-  db.products.forEach((p,i)=>p.order=i);
-  Promise.all(db.products.map(p=>saveProduct(p, true)))
+  const [moved]=_src.splice(fromIdx,1);
+  _src.splice(toIdx,0,moved);
+  _src.forEach((p,i)=>p.order=i);
+  if(_allProducts.length>0) _allProducts=[..._src];
+  Promise.all(_src.map(p=>saveProduct(p, true)))
     .then(()=>loadFromSupabase())
     .then(()=>{ renderAdminTable(); showToast('Orden actualizado'); })
     .catch(e=>showToast('Error al guardar orden: '+e.message,'error'));
@@ -1879,21 +1954,24 @@ function submitProduct(){
 
   const btn=document.getElementById('btn-add')||document.querySelector('.btn-submit');
   if(editId){
-    const idx=db.products.findIndex(p=>p.id===editId);
+    const _src2=_allProducts.length>0?_allProducts:db.products;
+    const idx=_src2.findIndex(p=>p.id===editId);
     if(idx!==-1){
-      const old=db.products[idx];
+      const old=_src2[idx];
       if(old.price!==price){
         if(!old.priceHistory) old.priceHistory=[];
         old.priceHistory.push({price:old.price,date:new Date().toISOString()});
       }
-      db.products[idx]={...old,...data};
-      saveProduct(db.products[idx])
+      _src2[idx]={...old,...data};
+      if(_allProducts.length>0) _allProducts=[..._src2];
+      saveProduct(_src2[idx])
         .then(()=>{ showToast('Producto actualizado','success'); cancelEdit(); renderAdminTable(); renderStats(); renderCatalog(); })
         .catch(e=>showToast('Error: '+e.message,'error'));
     }
   } else {
-    data.id='p'+Date.now(); data.order=db.products.length; data.priceHistory=[];
+    data.id='p'+Date.now(); data.order=(_allProducts.length>0?_allProducts:db.products).length; data.priceHistory=[];
     db.products.push(data);
+    if(_allProducts.length>0) _allProducts.push(data);
     saveProduct(data)
       .then(()=>{ showToast('Producto agregado','success'); clearForm();
         document.getElementById('atab-form').textContent='Agregar producto';
@@ -1943,14 +2021,16 @@ function clearForm(){
 }
 
 function toggleStock(id){
-  const p=db.products.find(x=>x.id===id); if(!p) return;
+  const p=(_allProducts.length>0?_allProducts:db.products).find(x=>x.id===id); if(!p) return;
+  const dp=db.products.find(x=>x.id===id); if(dp) dp.inStock=!p.inStock;
   p.inStock=!p.inStock;
   saveProduct(p).then(()=>{ renderAdminTable(); renderStats(); renderCatalog();
     showToast(p.inStock?'Marcado disponible':'Marcado agotado'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
 function toggleVisible(id){
-  const p=db.products.find(x=>x.id===id); if(!p) return;
+  const p=(_allProducts.length>0?_allProducts:db.products).find(x=>x.id===id); if(!p) return;
+  const dv=db.products.find(x=>x.id===id); if(dv) dv.visible=p.visible===false?true:false;
   p.visible=p.visible===false?true:false;
   saveProduct(p).then(()=>{ renderAdminTable(); renderStats(); renderCatalog();
     showToast(p.visible?'Producto visible':'Producto oculto'); })
@@ -1967,6 +2047,7 @@ function confirmDelete(){
   if(!pendingDeleteId) return;
   const id=pendingDeleteId;
   db.products=db.products.filter(p=>p.id!==id);
+  _allProducts=_allProducts.filter(p=>p.id!==id);
   deleteProductRemote(id)
     .then(()=>{ closeDelModal(); renderAdminTable(); renderStats(); renderCatalog(); showToast('Producto eliminado'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
@@ -2027,7 +2108,7 @@ function exportJSON(){
 
 function exportCSV(){
   const cols=['nombre','precio','categoria','descripcion','emoji','stock','visible','tags'];
-  const rows=db.products.map(p=>[
+  const rows=(_allProducts.length>0?_allProducts:db.products).map(p=>[
     csvCell(p.name), p.price, csvCell(p.category||''), csvCell(p.desc||''),
     csvCell(p.emoji||''), p.inStock?1:0, p.visible!==false?1:0,
     csvCell((p.tags||[]).join(';'))
@@ -2061,6 +2142,7 @@ function importJSON(inp){
         saveConfig('categories',db.categories),
         saveConfig('banner',db.banner)
       ]).then(()=>{ renderAdmin(); renderCatalog(); applyBanner();
+        _allProducts=[...db.products]; _totalProducts=_allProducts.length;
         showToast('Importación exitosa: '+db.products.length+' productos','success'); })
       .catch(e=>showToast('Error al importar: '+e.message,'error'));
     }catch(err){showToast('Error: '+err.message,'error');}
@@ -2088,7 +2170,7 @@ function importCSV(inp){
           inStock: cols[5]!=='0',
           visible: cols[6]!=='0',
           tags:    (cols[7]||'').split(';').map(t=>t.trim()).filter(Boolean),
-          order:   db.products.length+i,
+          order:   (_allProducts.length>0?_allProducts:db.products).length+i,
           priceHistory:[],
           imgUrl:'',
         };
