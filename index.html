@@ -1054,6 +1054,7 @@ let _allProducts   = [];
 let _catalogTotal  = 0; // total matching current catalog filters (from server)
 
 async function loadFromSupabase(fullReload=true){
+  console.log('[Load] loadFromSupabase called. fullReload='+fullReload+' _firstLoad='+_firstLoad);
   if(_firstLoad) showPageLoader(true);
   try {
     if(fullReload){
@@ -1073,6 +1074,7 @@ async function loadFromSupabase(fullReload=true){
       const allRows  = await sb.selectAll('products','order=sort_order.asc');
       _allProducts   = allRows.map(rowToProduct);
       _totalProducts = _allProducts.length;
+      console.log('[Load] _allProducts loaded: '+_allProducts.length+' productos');
     }
 
     // Load current catalog page with server-side filters
@@ -1681,17 +1683,21 @@ function fallbackCopy(text){
 //  ADMIN
 // ═══════════════════════════════════════════
 function renderAdmin(){
+  console.log('[Admin] renderAdmin called. sbConfigured='+sbConfigured+' _allProducts.length='+_allProducts.length+' db.products.length='+db.products.length);
   // If products haven't loaded yet, trigger a load and show a loading indicator
   if(sbConfigured && _allProducts.length === 0){
     const tbody = document.getElementById('admin-tbody');
     if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--tl)">Cargando productos...</td></tr>';
+    console.log('[Admin] _allProducts empty, triggering loadFromSupabase');
     loadFromSupabase(true);
     return;
   }
   // Reset category filter so it rebuilds with current categories
   const catWrap = document.getElementById('admin-cat-filter-wrap');
   if(catWrap) catWrap.innerHTML = '';
+  console.log('[Admin] calling renderStats/renderCatChips/renderCategorySelect/renderAdminTable');
   renderStats(); renderCatChips(); renderCategorySelect(); renderAdminTable(); generateQR();
+  console.log('[Admin] renderAdmin complete');
 }
 
 function switchAdminTab(tab){
@@ -1736,6 +1742,7 @@ function adminGoPage(n){
   renderAdminTable();
   document.getElementById('admin-tbody').closest('.admin-table-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
+function getCatNames(){ return db.categories.map(c=>c.name||c); }
 function getCatObj(name){ return db.categories.find(c=>(c.name||c)===name); }
 
 function renderCatChips(){
@@ -1835,12 +1842,11 @@ function deleteSubcat(catName,sub){
 function renderAdminTable(){
   const tbody = document.getElementById('admin-tbody');
   const empty = document.getElementById('empty-admin');
-  if(!tbody) return;
+  if(!tbody){ console.log('[AdminTable] tbody not found!'); return; }
 
   const query = (document.getElementById('admin-search')?.value||'').toLowerCase().trim();
-
-  // Always use full list — fall back to db.products while _allProducts loads
   const source = _allProducts.length > 0 ? _allProducts : db.products;
+  console.log('[AdminTable] source.length='+source.length+' query="'+query+'"');
 
   // Rebuild category filter only if it doesn't exist yet
   const catFilterWrap = document.getElementById('admin-cat-filter-wrap');
