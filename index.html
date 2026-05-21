@@ -581,7 +581,7 @@ tr.dragging{opacity:.4;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input class="search-input" type="text" id="search-input" placeholder="Buscar productos..." oninput="onSearchInput()">
       </div>
-      <select class="filter-select" id="stock-filter" onchange="currentPage=1;renderCatalog()">
+      <select class="filter-select" id="stock-filter" onchange="currentPage=1;_catalogTotal=0;const q=(document.getElementById('search-input')?.value||'').trim();if(sbConfigured&&!q){loadFromSupabase(false);}else{renderCatalog();}">
         <option value="all">Todo el stock</option>
         <option value="avail">Disponibles</option>
         <option value="out">Agotados</option>
@@ -1362,6 +1362,22 @@ function applyBanner(){
 function closeBanner(){ document.getElementById('promo-banner').classList.remove('show'); }
 
 // ═══════════════════════════════════════════
+//  SEARCH  (local, instantaneous)
+// ═══════════════════════════════════════════
+let _searchTimer = null;
+function onSearchInput(){
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(()=>{
+    currentPage = 1;
+    _catalogTotal = 0;
+    const q = (document.getElementById('search-input')?.value||'').trim();
+    // If query is empty, go back to server-paginated mode
+    if(!q && sbConfigured){ loadFromSupabase(false); return; }
+    renderCatalog();
+  }, 150);
+}
+
+// ═══════════════════════════════════════════
 //  CATALOG
 // ═══════════════════════════════════════════
 function renderCatalog(){
@@ -1370,27 +1386,46 @@ function renderCatalog(){
   const empty       = document.getElementById('empty-catalog');
   const paginationEl= document.getElementById('pagination');
 
-  // When Supabase is active, db.products is already the correct filtered page from server.
-  // Local filtering only used as fallback (no Supabase).
-  let prods = db.products;
+  const query = (document.getElementById('search-input')?.value||'').toLowerCase().trim();
+  const stock  = document.getElementById('stock-filter')?.value || 'all';
 
-  if(!sbConfigured){
-    const query=(document.getElementById('search-input').value||'').toLowerCase().trim();
-    const stock=document.getElementById('stock-filter').value;
-    prods=prods.filter(p=>p.visible!==false);
-    if(activeCategory!=='all') prods=prods.filter(p=>p.category===activeCategory);
-    if(activeSub!=='all')      prods=prods.filter(p=>(p.subcategory||'')===activeSub);
-    if(stock==='avail') prods=prods.filter(p=>p.inStock);
-    if(stock==='out')   prods=prods.filter(p=>!p.inStock);
-    if(query) prods=prods.filter(p=>
-      p.name.toLowerCase().includes(query)||
-      (p.desc||'').toLowerCase().includes(query)||
-      (p.tags||[]).some(t=>t.toLowerCase().includes(query))
+  // If there's a search query AND we have _allProducts in memory → filter locally (instant, no network)
+  let prods;
+  let isLocalSearch = false;
+
+  if(sbConfigured && query && _allProducts.length > 0){
+    isLocalSearch = true;
+    prods = _allProducts.filter(p => p.visible !== false);
+    if(activeCategory !== 'all') prods = prods.filter(p => p.category === activeCategory);
+    if(activeSub !== 'all')      prods = prods.filter(p => (p.subcategory||'') === activeSub);
+    if(stock === 'avail') prods = prods.filter(p => p.inStock);
+    if(stock === 'out')   prods = prods.filter(p => !p.inStock);
+    prods = prods.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      (p.desc||'').toLowerCase().includes(query) ||
+      (p.category||'').toLowerCase().includes(query) ||
+      (p.tags||[]).some(t => t.toLowerCase().includes(query))
     );
-    prods.sort((a,b)=>(a.order??99)-(b.order??99));
+    prods.sort((a,b) => (a.order??99) - (b.order??99));
+  } else if(!sbConfigured){
+    // Local-only fallback (no Supabase)
+    prods = db.products.filter(p => p.visible !== false);
+    if(activeCategory !== 'all') prods = prods.filter(p => p.category === activeCategory);
+    if(activeSub !== 'all')      prods = prods.filter(p => (p.subcategory||'') === activeSub);
+    if(stock === 'avail') prods = prods.filter(p => p.inStock);
+    if(stock === 'out')   prods = prods.filter(p => !p.inStock);
+    if(query) prods = prods.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      (p.desc||'').toLowerCase().includes(query) ||
+      (p.tags||[]).some(t => t.toLowerCase().includes(query))
+    );
+    prods.sort((a,b) => (a.order??99) - (b.order??99));
+  } else {
+    // Supabase paginated mode (no query) — db.products already has the right page
+    prods = db.products;
   }
 
-  if(!prods.length && _catalogTotal === 0){
+  if(!prods.length && _catalogTotal === 0 && !isLocalSearch){
     grid.innerHTML=''; empty.style.display='block'; paginationEl.style.display='none'; return;
   }
   if(!prods.length){
@@ -1398,14 +1433,14 @@ function renderCatalog(){
   }
   empty.style.display='none';
 
-  const serverTotal = sbConfigured
-    ? (_catalogTotal > 0 ? _catalogTotal : (prods.length > 0 ? prods.length : 0))
-    : prods.length;
+  // For local search: paginate the filtered results client-side
+  // For Supabase paginated mode: server already returned the right page
+  const serverTotal = (isLocalSearch || !sbConfigured) ? prods.length
+    : (_catalogTotal > 0 ? _catalogTotal : prods.length);
   const totalPages  = Math.max(1, Math.ceil(serverTotal / PAGE_SIZE));
-  // Clamp currentPage
   if(currentPage > totalPages) currentPage = totalPages;
   const start       = (currentPage-1)*PAGE_SIZE;
-  const paginated   = sbConfigured ? prods : prods.slice(start, start+PAGE_SIZE);
+  const paginated   = (isLocalSearch || !sbConfigured) ? prods.slice(start, start+PAGE_SIZE) : prods;
 
   const relatedMap=new Map();
   const _catSrc=_allProducts.length>0?_allProducts:db.products;
@@ -1640,6 +1675,13 @@ function fallbackCopy(text){
 //  ADMIN
 // ═══════════════════════════════════════════
 function renderAdmin(){
+  // If products haven't loaded yet, trigger a load and show a loading indicator
+  if(sbConfigured && _allProducts.length === 0){
+    const tbody = document.getElementById('admin-tbody');
+    if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--tl)">Cargando productos...</td></tr>';
+    loadFromSupabase(true);
+    return;
+  }
   // Reset category filter so it rebuilds with current categories
   const catWrap = document.getElementById('admin-cat-filter-wrap');
   if(catWrap) catWrap.innerHTML = '';
@@ -1989,7 +2031,8 @@ function onDrop(e,targetId){
 //  PRICE HISTORY
 // ═══════════════════════════════════════════
 function showPriceHistory(id){
-  const p=db.products.find(x=>x.id===id); if(!p) return;
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id); if(!p) return;
   document.getElementById('ph-title').textContent='Historial: '+p.name;
   const list=document.getElementById('ph-list');
   const ph=p.priceHistory||[];
@@ -2056,7 +2099,8 @@ function submitProduct(){
 }
 
 function editProduct(id){
-  const p=db.products.find(x=>x.id===id); if(!p) return;
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id); if(!p) return;
   document.getElementById('f-name').value    =p.name;
   document.getElementById('f-price').value   =p.price;
   document.getElementById('f-desc').value    =p.desc||'';
@@ -2112,7 +2156,8 @@ function toggleVisible(id){
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
 function askDelete(id){
-  const p=db.products.find(x=>x.id===id); if(!p) return;
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id); if(!p) return;
   pendingDeleteId=id;
   document.getElementById('del-msg').textContent='¿Eliminar "'+p.name+'"? Esta acción no se puede deshacer.';
   document.getElementById('del-overlay').classList.add('show');
