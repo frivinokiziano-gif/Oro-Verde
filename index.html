@@ -312,6 +312,8 @@ a{text-decoration:none;color:inherit;}
 .admin-table-card{background:var(--white);border-radius:var(--rlg);padding:1.1rem;box-shadow:var(--ssm);overflow-x:auto;}
 .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.5rem;}
 .table-count{font-size:.78rem;color:var(--tl);}
+.btn-delete-all{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--rsm);border:1.5px solid var(--red);background:transparent;color:var(--red);font-size:.78rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;}
+.btn-delete-all:hover{background:var(--red);color:#fff;}
 .table-search-wrap{position:relative;}
 .table-search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--tl);}
 .table-search{padding:6px 9px 6px 28px;border-radius:var(--rsm);border:1.5px solid var(--creamd);background:var(--cream);font-size:.8rem;width:200px;transition:border-color .15s;}
@@ -473,7 +475,7 @@ tr.dragging{opacity:.4;}
     <p id="del-msg"></p>
     <div class="del-actions">
       <button class="btn-del-cancel" onclick="closeDelModal()">Cancelar</button>
-      <button class="btn-del-confirm" onclick="confirmDelete()">Eliminar</button>
+      <button class="btn-del-confirm" onclick="pendingDeleteId==='__ALL__'?confirmDeleteAll():confirmDelete()">Eliminar</button>
     </div>
   </div>
 </div>
@@ -676,6 +678,10 @@ tr.dragging{opacity:.4;}
             <input class="table-search" type="text" id="admin-search" placeholder="Buscar en todos los productos..." oninput="renderAdminTable()">
           </div>
           <div class="table-count" id="table-count"></div>
+          <button class="btn-delete-all" onclick="askDeleteAll()" title="Eliminar todos los productos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Eliminar todo
+          </button>
         </div>
       </div>
       <table>
@@ -2171,6 +2177,35 @@ function confirmDelete(){
   deleteProductRemote(id)
     .then(()=>{ closeDelModal(); renderAdminTable(); renderStats(); renderCatalog(); showToast('Producto eliminado'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
+}
+
+function askDeleteAll(){
+  const total = _allProducts.length > 0 ? _allProducts.length : db.products.length;
+  if(!total){ showToast('No hay productos para eliminar','error'); return; }
+  document.getElementById('del-msg').textContent =
+    `¿Eliminar los ${total} productos? Esta acción no se puede deshacer.`;
+  // Reuse del-overlay but wire confirm to deleteAll
+  pendingDeleteId = '__ALL__';
+  document.getElementById('del-overlay').classList.add('show');
+}
+
+async function confirmDeleteAll(){
+  const src = _allProducts.length > 0 ? [..._allProducts] : [...db.products];
+  closeDelModal();
+  showToast('Eliminando '+src.length+' productos...');
+  try {
+    // Delete in batches of 10 to avoid overwhelming the API
+    for(let i=0;i<src.length;i+=10){
+      const batch=src.slice(i,i+10);
+      await Promise.all(batch.map(p=>sb.delete('products',p.id)));
+    }
+    db.products=[]; _allProducts=[]; _totalProducts=0; _catalogTotal=0;
+    renderAdminTable(); renderStats(); renderCatalog();
+    showToast('Todos los productos eliminados','success');
+  } catch(e){
+    showToast('Error al eliminar: '+e.message,'error');
+    await loadFromSupabase(true);
+  }
 }
 
 // ═══════════════════════════════════════════
