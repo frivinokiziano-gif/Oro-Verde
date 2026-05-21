@@ -579,7 +579,7 @@ tr.dragging{opacity:.4;}
     <div class="search-row">
       <div class="search-input-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-input" type="text" id="search-input" placeholder="Buscar productos..." oninput="currentPage=1;renderCatalog()">
+        <input class="search-input" type="text" id="search-input" placeholder="Buscar productos..." oninput="onSearchInput()">
       </div>
       <select class="filter-select" id="stock-filter" onchange="currentPage=1;renderCatalog()">
         <option value="all">Todo el stock</option>
@@ -859,32 +859,65 @@ const sb = {
   _h(extra={}){ return {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,...extra}; },
 
   async select(table, qs=''){
-    const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{headers:this._h({'Prefer':'return=representation'})});
+    // Use Range 0-9999 to bypass Supabase default 1000-row limit for config tables
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{
+      headers:this._h({'Prefer':'return=representation','Range-Unit':'items','Range':'0-9999'})
+    });
     if(!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  // Fetch a specific page of products with server-side filters
+
+  // Fetch ONE page with correct headers (no duplicate Prefer)
   async selectPage(table, qs='', page=1, pageSize=40){
     const from=(page-1)*pageSize;
     const to=from+pageSize-1;
     const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{
-      headers:this._h({'Prefer':'return=representation','Range-Unit':'items','Range':`${from}-${to}`,'Prefer':'count=exact'})
+      headers:this._h({
+        'Range-Unit': 'items',
+        'Range':      `${from}-${to}`,
+        'Prefer':     'count=exact'
+      })
     });
     if(!r.ok) throw new Error(await r.text());
     const data=await r.json();
-    const contentRange=r.headers.get('Content-Range')||'';
-    const total=parseInt(contentRange.split('/')[1])||data.length;
+    const cr=r.headers.get('Content-Range')||'';   // e.g. "0-39/1224"
+    const total=parseInt((cr.split('/')[1])||'0')||0;
     return {data, total};
   },
-  // Fetch only the total count (very lightweight — used by polling)
+
+  // Fetch ALL rows bypassing Supabase 1000-row default limit
+  // Uses pagination internally and stitches results together
+  async selectAll(table, qs=''){
+    const BATCH = 1000;
+    let page = 0, all = [];
+    while(true){
+      const from = page * BATCH;
+      const to   = from + BATCH - 1;
+      const r = await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{
+        headers: this._h({'Range-Unit':'items','Range':`${from}-${to}`,'Prefer':'count=exact'})
+      });
+      if(!r.ok) break;
+      const batch = await r.json();
+      if(!Array.isArray(batch)||!batch.length) break;
+      all = all.concat(batch);
+      const cr    = r.headers.get('Content-Range')||'';
+      const total = parseInt((cr.split('/')[1])||'0')||0;
+      if(all.length >= total) break;
+      page++;
+    }
+    return all;
+  },
+
+  // Lightweight count only
   async count(table, qs=''){
     const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}&select=id`,{
-      headers:this._h({'Prefer':'count=exact','Range':'0-0'})
+      headers:this._h({'Range-Unit':'items','Range':'0-0','Prefer':'count=exact'})
     });
     if(!r.ok) return null;
-    const contentRange=r.headers.get('Content-Range')||'';
-    return parseInt(contentRange.split('/')[1]) ?? null;
+    const cr=r.headers.get('Content-Range')||'';
+    return parseInt((cr.split('/')[1])||'0')||null;
   },
+
   async upsert(table, data){
     const r=await fetch(`${SB_URL}/rest/v1/${table}`,{
       method:'POST', headers:this._h({'Prefer':'resolution=merge-duplicates,return=representation'}),
@@ -907,6 +940,7 @@ const sb = {
     await this.upsert('config',{key, value});
   }
 };
+
 
 // ═══════════════════════════════════════════
 //  PIN SECURITY
@@ -1010,7 +1044,8 @@ let _pollTimer = null;
 let _firstLoad  = true;
 
 let _totalProducts = 0;
-let _allProducts   = []; // full list — used by admin table, search, stats
+let _allProducts   = [];
+let _catalogTotal  = 0; // total matching current catalog filters (from server)
 
 async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
@@ -1024,17 +1059,21 @@ async function loadFromSupabase(fullReload=true){
       if(cats)    db.categories = cats;
       if(banner)  db.banner     = banner;
       if(pinHash) localStorage.setItem(PIN_HASH_KEY, pinHash);
+    }
 
-      // Load ALL products once for admin (stats, table, search)
-      const allRows = await sb.select('products','order=sort_order.asc');
+    // Always load ALL products (bypasses 1000-row limit) — used by admin + stats + search
+    // Only reload full list when: first load, forced fullReload, or _allProducts is empty
+    if(fullReload || _allProducts.length === 0){
+      const allRows  = await sb.selectAll('products','order=sort_order.asc');
       _allProducts   = allRows.map(rowToProduct);
       _totalProducts = _allProducts.length;
     }
 
-    // Load current catalog page (40 products) for display
-    const qs = 'order=sort_order.asc';
-    const {data} = await sb.selectPage('products', qs, currentPage, PAGE_SIZE);
-    db.products = data.map(rowToProduct);
+    // Load current catalog page with server-side filters
+    const catalogQS = buildCatalogQS();
+    const {data, total} = await sb.selectPage('products', catalogQS, currentPage, PAGE_SIZE);
+    db.products    = data.map(rowToProduct);
+    _catalogTotal  = total;
 
     sbConfigured = true;
   } catch(e) {
@@ -1043,9 +1082,10 @@ async function loadFromSupabase(fullReload=true){
       const raw=localStorage.getItem('oroverde_data');
       if(raw){
         const d=JSON.parse(raw);
-        db.products  = d.products||[];
-        _allProducts = d.products||[];
+        db.products    = d.products||[];
+        _allProducts   = d.products||[];
         _totalProducts = _allProducts.length;
+        _catalogTotal  = _allProducts.length;
         if(d.categories) db.categories=d.categories;
         if(d.banner)     db.banner=d.banner;
       }
@@ -1062,7 +1102,7 @@ async function loadFromSupabase(fullReload=true){
   } else {
     renderCatalog();
     applyBanner();
-    if(currentView==='admin') renderAdminTable();
+    if(currentView==='admin') renderAdmin();
   }
 
   if(!_pollTimer && sbConfigured){
@@ -1070,11 +1110,10 @@ async function loadFromSupabase(fullReload=true){
       try {
         const newCount = await sb.count('products','order=sort_order.asc');
         if(newCount !== null && newCount !== _totalProducts){
-          await loadFromSupabase(true); // full reload if count changed
+          await loadFromSupabase(true);
         } else {
-          // Silently refresh current catalog page only
-          const qs='order=sort_order.asc';
-          const {data} = await sb.selectPage('products',qs,currentPage,PAGE_SIZE);
+          // Silently refresh catalog page only
+          const {data} = await sb.selectPage('products', buildCatalogQS(), currentPage, PAGE_SIZE);
           db.products = data.map(rowToProduct);
           renderCatalog();
           if(currentView==='admin') renderAdminTable();
@@ -1082,6 +1121,19 @@ async function loadFromSupabase(fullReload=true){
       } catch{}
     }, 15000);
   }
+}
+
+// Build Supabase query string based on active catalog filters
+function buildCatalogQS(){
+  let qs = 'order=sort_order.asc&visible=eq.true';
+  if(activeCategory !== 'all') qs += `&category=eq.${encodeURIComponent(activeCategory)}`;
+  if(activeSub !== 'all')      qs += `&subcategory=eq.${encodeURIComponent(activeSub)}`;
+  const stock = document.getElementById('stock-filter')?.value||'all';
+  if(stock === 'avail') qs += '&in_stock=eq.true';
+  if(stock === 'out')   qs += '&in_stock=eq.false';
+  const q = (document.getElementById('search-input')?.value||'').trim();
+  if(q) qs += `&name=ilike.*${encodeURIComponent(q)}*`;
+  return qs;
 }
 
 // ─── Save helpers ───
@@ -1158,7 +1210,14 @@ function switchView(view) {
   document.getElementById('search-area').style.display = view==='catalog'?'block':'none';
   if(view==='catalog') renderCatalog();
   if(view==='cart')    renderCart();
-  if(view==='admin')   renderAdmin();
+  if(view==='admin'){
+    // If full product list hasn't loaded yet, force a full reload
+    if(sbConfigured && _allProducts.length === 0){
+      loadFromSupabase(true);
+    } else {
+      renderAdmin();
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1307,40 +1366,47 @@ function closeBanner(){ document.getElementById('promo-banner').classList.remove
 // ═══════════════════════════════════════════
 function renderCatalog(){
   renderFilterChips();
-  const query=(document.getElementById('search-input').value||'').toLowerCase().trim();
-  const stock=document.getElementById('stock-filter').value;
-  const grid=document.getElementById('product-grid');
-  const empty=document.getElementById('empty-catalog');
-  const paginationEl=document.getElementById('pagination');
+  const grid        = document.getElementById('product-grid');
+  const empty       = document.getElementById('empty-catalog');
+  const paginationEl= document.getElementById('pagination');
 
-  let prods=db.products.filter(p=>p.visible!==false);
-  if(activeCategory!=='all') prods=prods.filter(p=>p.category===activeCategory);
-  if(activeSub!=='all')      prods=prods.filter(p=>(p.subcategory||'')===activeSub);
-  if(stock==='avail') prods=prods.filter(p=>p.inStock);
-  if(stock==='out')   prods=prods.filter(p=>!p.inStock);
-  if(query) prods=prods.filter(p=>
-    p.name.toLowerCase().includes(query)||
-    (p.desc||'').toLowerCase().includes(query)||
-    (p.category||'').toLowerCase().includes(query)||
-    (p.subcategory||'').toLowerCase().includes(query)||
-    (p.tags||[]).some(t=>t.toLowerCase().includes(query))
-  );
-  prods.sort((a,b)=>(a.order??99)-(b.order??99));
+  // When Supabase is active, db.products is already the correct filtered page from server.
+  // Local filtering only used as fallback (no Supabase).
+  let prods = db.products;
 
+  if(!sbConfigured){
+    const query=(document.getElementById('search-input').value||'').toLowerCase().trim();
+    const stock=document.getElementById('stock-filter').value;
+    prods=prods.filter(p=>p.visible!==false);
+    if(activeCategory!=='all') prods=prods.filter(p=>p.category===activeCategory);
+    if(activeSub!=='all')      prods=prods.filter(p=>(p.subcategory||'')===activeSub);
+    if(stock==='avail') prods=prods.filter(p=>p.inStock);
+    if(stock==='out')   prods=prods.filter(p=>!p.inStock);
+    if(query) prods=prods.filter(p=>
+      p.name.toLowerCase().includes(query)||
+      (p.desc||'').toLowerCase().includes(query)||
+      (p.tags||[]).some(t=>t.toLowerCase().includes(query))
+    );
+    prods.sort((a,b)=>(a.order??99)-(b.order??99));
+  }
+
+  if(!prods.length && _catalogTotal === 0){
+    grid.innerHTML=''; empty.style.display='block'; paginationEl.style.display='none'; return;
+  }
   if(!prods.length){
     grid.innerHTML=''; empty.style.display='block'; paginationEl.style.display='none'; return;
   }
   empty.style.display='none';
 
-  // Use server total for pagination when Supabase is active
-  // prods here is already the current page slice from Supabase
-  const serverTotal = sbConfigured ? _totalProducts : prods.length;
-  const totalPages  = Math.ceil(serverTotal / PAGE_SIZE);
+  const serverTotal = sbConfigured
+    ? (_catalogTotal > 0 ? _catalogTotal : (prods.length > 0 ? prods.length : 0))
+    : prods.length;
+  const totalPages  = Math.max(1, Math.ceil(serverTotal / PAGE_SIZE));
+  // Clamp currentPage
+  if(currentPage > totalPages) currentPage = totalPages;
   const start       = (currentPage-1)*PAGE_SIZE;
-  // When using Supabase pagination, prods IS already the page slice
   const paginated   = sbConfigured ? prods : prods.slice(start, start+PAGE_SIZE);
 
-  // Pre-build related map once (avoid N² filter for 1000 products)
   const relatedMap=new Map();
   const _catSrc=_allProducts.length>0?_allProducts:db.products;
   if(_catSrc.length < 500){
@@ -1352,24 +1418,21 @@ function renderCatalog(){
 
   grid.innerHTML=paginated.map(p=>{
     const imgHtml=p.imgUrl
-      ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'📦'}</div>`
-      :`<div class="card-emoji">${p.emoji||'📦'}</div>`;
+      ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'\u{1F4E6}'}</div>`
+      :`<div class="card-emoji">${p.emoji||'\u{1F4E6}'}</div>`;
     const ci=cart.find(c=>c.id===p.id); const qty=ci?ci.qty:0;
     const tagsHtml=renderTagChips(p.tags||[]);
-
-    // Related: only show when product count < 500 to avoid slowdown
     let relatedHtml='';
     if(relatedMap.size){
       const related=(relatedMap.get(p.category)||[]).filter(x=>x.id!==p.id).slice(0,3);
       if(related.length) relatedHtml=`<div class="related-section"><div class="related-title">También te puede interesar</div><div class="related-chips">${related.map(r=>`<span class="related-chip" onclick="scrollToProduct('${r.id}')">${esc(r.name)}</span>`).join('')}</div></div>`;
     }
-
     return `<div class="product-card${p.inStock?'':' out-of-stock'}" id="card-${p.id}">
       <div class="card-img-wrap">${imgHtml}
-        <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'✓':'✗'}</span>
+        <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'\u2713':'\u2717'}</span>
       </div>
       <div class="card-body">
-        ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` › ${esc(p.subcategory)}`:''}</div>`:''}
+        ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` \u203a ${esc(p.subcategory)}`:''}</div>`:''}
         <div class="card-name">${esc(p.name)}</div>
         ${p.desc?`<div class="card-desc">${esc(p.desc)}</div>`:''}
         ${tagsHtml?`<div class="card-tags">${tagsHtml}</div>`:''}
@@ -1379,12 +1442,12 @@ function renderCatalog(){
       <div class="card-footer">
         ${qty>0
           ?`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
-              <button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button>
+              <button class="qty-btn" onclick="changeQty('${p.id}',-1)">\u2212</button>
               <input type="number" class="qty-val" value="${qty}" min="1"
                 onchange="setQty('${p.id}',this.value)"
                 onfocus="this.select()">
               <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
-              <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">✕</button>
+              <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">\u2715</button>
             </div>`
           :`<button class="btn-add-cart" onclick="addToCart('${p.id}')" ${p.inStock?'':'disabled'}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -1395,24 +1458,22 @@ function renderCatalog(){
     </div>`;
   }).join('');
 
-  // Render pagination controls
   if(totalPages<=1){ paginationEl.style.display='none'; return; }
   paginationEl.style.display='flex';
   let pages='';
-  // Prev button
   pages+=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
-  // Page numbers — show max 5 around current
   const range=2;
   for(let i=1;i<=totalPages;i++){
-    if(i===1||i===totalPages||Math.abs(i-currentPage)<=range){
+    if(i===1||i===totalPages||Math.abs(i-currentPage)<=range)
       pages+=`<button class="page-btn${i===currentPage?' active':''}" onclick="goPage(${i})">${i}</button>`;
-    } else if(Math.abs(i-currentPage)===range+1){
+    else if(Math.abs(i-currentPage)===range+1)
       pages+=`<span class="page-info">…</span>`;
-    }
   }
-  // Next button
   pages+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
-  pages+=`<span class="page-info">${start+1}2013${Math.min(start+PAGE_SIZE,serverTotal)} de ${serverTotal}</span>`;
+  // Calculate correct from/to based on actual page data received
+  const showing_from = serverTotal === 0 ? 0 : (currentPage-1)*PAGE_SIZE + 1;
+  const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
+  pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
   paginationEl.innerHTML=pages;
 }
 
@@ -1457,10 +1518,14 @@ function renderFilterChips(){
     ).join('');
 }
 function setCategory(c){
-  activeCategory=c; activeSub='all'; currentPage=1; renderCatalog();
+  activeCategory=c; activeSub='all'; currentPage=1;
+  _catalogTotal=0; // reset so pagination doesn't show stale count
+  if(sbConfigured) loadFromSupabase(false); else renderCatalog();
 }
 function setSubcat(s){
-  activeSub=s; currentPage=1; renderCatalog();
+  activeSub=s; currentPage=1;
+  _catalogTotal=0; // reset so pagination doesn't show stale count
+  if(sbConfigured) loadFromSupabase(false); else renderCatalog();
 }
 
 // ═══════════════════════════════════════════
@@ -1575,6 +1640,9 @@ function fallbackCopy(text){
 //  ADMIN
 // ═══════════════════════════════════════════
 function renderAdmin(){
+  // Reset category filter so it rebuilds with current categories
+  const catWrap = document.getElementById('admin-cat-filter-wrap');
+  if(catWrap) catWrap.innerHTML = '';
   renderStats(); renderCatChips(); renderCategorySelect(); renderAdminTable(); generateQR();
 }
 
@@ -1717,60 +1785,65 @@ function deleteSubcat(catName,sub){
 function renderAdminTable(){
   const tbody = document.getElementById('admin-tbody');
   const empty = document.getElementById('empty-admin');
-  const query = (document.getElementById('admin-search').value||'').toLowerCase().trim();
+  if(!tbody) return;
 
-  // Use _allProducts (full list) so search and filters work across all products
-  const source = (_allProducts.length > 0 ? _allProducts : db.products);
+  const query = (document.getElementById('admin-search')?.value||'').toLowerCase().trim();
+
+  // Always use full list — fall back to db.products while _allProducts loads
+  const source = _allProducts.length > 0 ? _allProducts : db.products;
+
+  // Rebuild category filter only if it doesn't exist yet
+  const catFilterWrap = document.getElementById('admin-cat-filter-wrap');
+  if(catFilterWrap && !document.getElementById('admin-cat-filter')){
+    const cats = getCatNames();
+    catFilterWrap.innerHTML = `<select id="admin-cat-filter" onchange="renderAdminTable()"
+      style="padding:6px 9px;border-radius:var(--rsm);border:1.5px solid var(--creamd);background:var(--cream);font-size:.8rem;">
+      <option value="">Todas las categorías</option>
+      ${cats.map(c=>`<option value="${escA(c)}">${esc(c)}</option>`).join('')}
+    </select>`;
+  }
+
+  const selectedCat = document.getElementById('admin-cat-filter')?.value || '';
+
   let prods = [...source].sort((a,b)=>(a.order??99)-(b.order??99));
-
-  if(query) prods = prods.filter(p=>
+  if(query)       prods = prods.filter(p=>
     p.name.toLowerCase().includes(query)||
     (p.category||'').toLowerCase().includes(query)||
     (p.subcategory||'').toLowerCase().includes(query)||
     (p.tags||[]).some(t=>t.toLowerCase().includes(query))
   );
-
-  // Admin category filter
-  const adminCatFilter = document.getElementById('admin-cat-filter');
-  const selectedCat = adminCatFilter ? adminCatFilter.value : '';
   if(selectedCat) prods = prods.filter(p=>p.category===selectedCat);
 
-  // Admin pagination
   const ADMIN_PAGE_SIZE = 50;
-  let adminPage = parseInt(document.getElementById('admin-page-input')?.value||1)||1;
+  const pageInp  = document.getElementById('admin-page-input');
+  let adminPage  = parseInt(pageInp?.value||'1')||1;
   const totalAdminPages = Math.max(1, Math.ceil(prods.length / ADMIN_PAGE_SIZE));
   if(adminPage > totalAdminPages) adminPage = totalAdminPages;
+  if(pageInp) pageInp.value = adminPage;
   const adminStart = (adminPage-1)*ADMIN_PAGE_SIZE;
   const prodsPage  = prods.slice(adminStart, adminStart+ADMIN_PAGE_SIZE);
 
   document.getElementById('table-count').textContent =
     `${prods.length} de ${source.length} producto${source.length!==1?'s':''}`;
 
-  // Render category filter dropdown
-  const catFilterWrap = document.getElementById('admin-cat-filter-wrap');
-  if(catFilterWrap){
-    const cats = getCatNames();
-    catFilterWrap.innerHTML = `<select id="admin-cat-filter" onchange="renderAdminTable()" style="padding:6px 9px;border-radius:var(--rsm);border:1.5px solid var(--creamd);background:var(--cream);font-size:.8rem;">
-      <option value="">Todas las categorías</option>
-      ${cats.map(c=>`<option value="${escA(c)}"${c===selectedCat?' selected':''}>${esc(c)}</option>`).join('')}
-    </select>`;
+  if(!source.length){
+    tbody.innerHTML=''; empty.style.display='block';
+    renderAdminPagination(0,1,1); return;
   }
-
-  if(!prodsPage.length){ tbody.innerHTML=''; empty.style.display='block'; renderAdminPagination(0,1,1); return; }
   empty.style.display='none';
   renderAdminPagination(prods.length, adminPage, totalAdminPages);
 
-  tbody.innerHTML=prodsPage.map(p=>{
-    const imgHtml=p.imgUrl
+  tbody.innerHTML = prodsPage.map(p=>{
+    const imgHtml = p.imgUrl
       ?`<img src="${esc(p.imgUrl)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="td-img-emoji" style="display:none">${p.emoji||'📦'}</div>`
       :`<div class="td-img-emoji">${p.emoji||'📦'}</div>`;
-    const pill=p.visible===false
+    const pill = p.visible===false
       ?`<span class="status-pill status-hidden"><span class="dot dot-gray"></span>Oculto</span>`
-      :p.inStock
+      : p.inStock
         ?`<span class="status-pill status-avail"><span class="dot dot-green"></span>Disponible</span>`
         :`<span class="status-pill status-out"><span class="dot dot-red"></span>Agotado</span>`;
-    const tagsHtml=renderTagChips(p.tags||[]);
-    const hasPH=(p.priceHistory||[]).length>0;
+    const tagsHtml = renderTagChips(p.tags||[]);
+    const hasPH    = (p.priceHistory||[]).length > 0;
 
     return `<tr draggable="true" data-id="${p.id}"
         ondragstart="onDragStart(event,'${p.id}')"
