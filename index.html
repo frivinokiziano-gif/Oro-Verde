@@ -1009,6 +1009,13 @@ const sb = {
     const rows=await this.select('config',`key=eq.${encodeURIComponent(key)}`);
     return rows.length?rows[0].value:null;
   },
+  async select(table, qs=''){
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{
+      headers:this._h({'Range-Unit':'items','Range':'0-9999'})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
   async setConfig(key, value){
     await this.upsert('config',{key, value});
   }
@@ -1088,7 +1095,7 @@ function rowToProduct(r){
     emoji:        r.emoji||'📦',
     imgUrl:       r.img_url||'',
     inStock:      r.in_stock,
-    visible:      r.visible,
+    visible:      r.visible !== false,  // normalize: undefined/null/true → true
     tags:         r.tags||[],
     order:        r.sort_order||0,
   };
@@ -1148,7 +1155,9 @@ async function loadFromSupabase(fullReload=true){
 
     sbConfigured = true;
   } catch(e) {
-    console.warn('Supabase no configurado o sin conexión, usando datos locales.',e);
+    const msg = e?.message || String(e);
+    // Only show error toast on first load so it's visible
+    if(_firstLoad) showToast('Error al cargar datos: '+msg, 'error');
     try {
       const raw=localStorage.getItem('oroverde_data');
       if(raw){
@@ -1180,10 +1189,24 @@ async function loadFromSupabase(fullReload=true){
     _pollTimer = setInterval(async ()=>{
       try {
         const newCount = await sb.count('products','order=sort_order.asc');
+        // Also check if categories or banner changed
+        const [newCats, newBanner] = await Promise.all([
+          sb.getConfig('categories'),
+          sb.getConfig('banner'),
+        ]);
+        const catsChanged = JSON.stringify(newCats) !== JSON.stringify(db.categories);
+        const bannerChanged = JSON.stringify(newBanner) !== JSON.stringify(db.banner);
+        if(catsChanged){
+          db.categories = newCats || db.categories;
+          renderFilterChips(); renderCatChips(); renderCategorySelect();
+        }
+        if(bannerChanged){
+          db.banner = newBanner || db.banner;
+          applyBanner();
+        }
         if(newCount !== null && newCount !== _totalProducts){
           await loadFromSupabase(true);
-        } else {
-          // Silently refresh current view
+        } else if(!catsChanged && !bannerChanged){
           await loadFromSupabase(false);
         }
       } catch{}
@@ -2545,8 +2568,10 @@ function toggleStock(id){
 }
 function toggleVisible(id){
   const p=(_allProducts.length>0?_allProducts:db.products).find(x=>x.id===id); if(!p) return;
-  const dv=db.products.find(x=>x.id===id); if(dv) dv.visible=p.visible===false?true:false;
-  p.visible=p.visible===false?true:false;
+  // Normalize: treat undefined/null as true (visible by default)
+  const currentlyVisible = p.visible !== false;
+  p.visible = !currentlyVisible;
+  const dv=db.products.find(x=>x.id===id); if(dv&&dv!==p) dv.visible=p.visible;
   saveProduct(p).then(()=>{ renderAdminTable(); renderStats(); renderCatalog();
     showToast(p.visible?'Producto visible':'Producto oculto'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
