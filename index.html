@@ -477,12 +477,6 @@ tr.dragging{opacity:.4;}
   <div class="loader-bar"><div class="loader-fill"></div></div>
 </div>
 
-<!-- Promo Banner -->
-<div id="promo-banner">
-  <span id="banner-text"></span>
-  <button id="banner-close" onclick="closeBanner()">✕</button>
-</div>
-
 <!-- PIN Modal -->
 <div id="pin-overlay" class="modal-overlay">
   <div class="modal-bg" onclick="closePinModal()"></div>
@@ -602,6 +596,10 @@ tr.dragging{opacity:.4;}
 
 <!-- Header -->
 <header id="main-header">
+  <div id="promo-banner">
+    <span id="banner-text"></span>
+    <button id="banner-close" onclick="closeBanner()">✕</button>
+  </div>
   <div class="header-inner">
     <div class="brand-name">Oro Verde</div>
     <nav class="header-nav">
@@ -2738,29 +2736,84 @@ function importCSV(inp){
   const r=new FileReader();
   r.onload=e=>{
     try{
-      const lines=e.target.result.split('\n').filter(l=>l.trim());
-      // skip header
-      const data=lines.slice(1).map((line,i)=>{
-        const cols=parseCSVLine(line);
+      // Strip UTF-8 BOM if present
+      const text = e.target.result.replace(/^\uFEFF/,'');
+      const rows = text.split('\n').filter(l=>l.trim());
+      if(rows.length<2){ showToast('CSV vacío o sin datos','error'); return; }
+
+      // Parse header and build column index map (normalize: lowercase, no accents, no spaces)
+      const norm = s => s.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9]/g,'');
+      const header = parseCSVLine(rows[0]).map(norm);
+
+      // Known column aliases
+      const aliases = {
+        nombre:      ['nombre','name','producto'],
+        precio:      ['precio','price','costo'],
+        categoria:   ['categoria','category','rubro'],
+        subcategoria:['subcategoria','subcategory','subcat','subcategoria'],
+        desc:        ['descripcion','description','desc','detalle'],
+        emoji:       ['emoji','icono','icon'],
+        inStock:     ['stock','instock','disponible','disponibilidad'],
+        visible:     ['visible','activo','active','mostrar'],
+        tags:        ['tags','etiquetas','palabras'],
+        imgUrl:      ['imagen','image','img','foto','url'],
+      };
+
+      // Map each field to its column index
+      const idx = {};
+      for(const [field, names] of Object.entries(aliases)){
+        idx[field] = names.reduce((found, alias) => {
+          if(found>=0) return found;
+          return header.indexOf(alias);
+        }, -1);
+      }
+
+      const col = (cols, field, fallback='') =>
+        idx[field]>=0 ? (cols[idx[field]]||fallback) : fallback;
+
+      const data = rows.slice(1).map((line, i) => {
+        const cols = parseCSVLine(line);
+        if(cols.every(c=>!c)) return null; // skip empty rows
+        const tagsRaw = col(cols,'tags');
+        let subcategory = col(cols,'subcategoria');
+        let desc        = col(cols,'desc');
+
+        // Auto-detect: if no subcategory column but desc matches a known subcategory, promote it
+        if(!subcategory && desc){
+          const allSubs = db.categories.flatMap(c=>(c.subs||[]));
+          if(allSubs.some(s=>s.toLowerCase()===desc.toLowerCase())){
+            subcategory = desc;
+            desc = '';
+          }
+        }
+
         return {
-          id:'imp'+Date.now()+i,
-          name:    cols[0]||'Producto',
-          price:   parseFloat(cols[1])||0,
-          category:cols[2]||'',
-          desc:    cols[3]||'',
-          emoji:   cols[4]||'📦',
-          inStock: cols[5]!=='0',
-          visible: cols[6]!=='0',
-          tags:    (cols[7]||'').split(';').map(t=>t.trim()).filter(Boolean),
-          order:   (_allProducts.length>0?_allProducts:db.products).length+i,
-          imgUrl:'',
+          id:       'imp'+Date.now()+i,
+          name:     col(cols,'nombre','Producto'),
+          price:    parseFloat(col(cols,'precio','0'))||0,
+          category: col(cols,'categoria'),
+          subcategory,
+          desc,
+          emoji:    col(cols,'emoji','📦'),
+          inStock:  col(cols,'inStock','1')!=='0',
+          visible:  col(cols,'visible','1')!=='0',
+          tags:     tagsRaw.split(/[;|]/).map(t=>t.trim()).filter(Boolean),
+          imgUrl:   col(cols,'imgUrl'),
+          order:    (_allProducts.length>0?_allProducts:db.products).length+i,
         };
-      });
+      }).filter(Boolean);
+
+      if(!data.length){ showToast('No se encontraron productos válidos','error'); return; }
+
       db.products.push(...data);
-      Promise.all(data.map(p=>saveProduct(p)))
+      if(_allProducts.length>0) _allProducts.push(...data);
+      Promise.all(data.map(p=>saveProduct(p,true)))
+        .then(()=>loadFromSupabase(true))
         .then(()=>{ renderAdmin(); renderCatalog(); showToast('Importados '+data.length+' productos','success'); })
         .catch(e=>showToast('Error al importar: '+e.message,'error'));
-    }catch(err){showToast('Error al importar CSV: '+err.message,'error');}
+    }catch(err){ showToast('Error al importar CSV: '+err.message,'error'); }
     inp.value='';
   };
   r.readAsText(file,'UTF-8');
