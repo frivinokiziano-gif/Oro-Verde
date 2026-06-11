@@ -380,8 +380,8 @@ tr.dragging{opacity:.4;}
 .td-img img{width:100%;height:100%;object-fit:cover;}
 .td-img-emoji{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;}
 .td-name{font-weight:600;color:var(--td);}
-.td-price{font-family:'Fraunces',serif;font-weight:800;color:var(--white);background:var(--gm);cursor:pointer;padding:4px 11px;border-radius:20px;transition:background .12s,transform .1s;display:inline-block;font-size:.97rem;box-shadow:0 1px 5px color-mix(in srgb,var(--gm) 40%,transparent);}
-.td-price:hover{background:var(--gd);transform:scale(1.06);}
+.td-price{font-family:'Courier New',Courier,monospace;font-weight:700;color:var(--gd);cursor:pointer;padding:4px 11px;border-radius:20px;transition:background .12s,transform .1s;display:inline-block;font-size:.97rem;box-shadow:0 1px 5px color-mix(in srgb,var(--gm) 40%,transparent);background:var(--gl);}
+.td-price:hover{background:var(--gm);color:var(--white);transform:scale(1.06);}
 .td-price-input{font-family:'Fraunces',serif;font-weight:700;color:var(--gd);font-size:inherit;width:90px;padding:3px 6px;border-radius:6px;border:2px solid var(--gm);background:var(--white);text-align:right;}
 .td-price-wrap{display:flex;flex-direction:column;gap:2px;}
 .td-cat{font-size:.72rem;color:var(--tl);}
@@ -661,7 +661,9 @@ tr.dragging{opacity:.4;}
         <p>Tu carrito está vacío</p>
       </div>
       <div class="cart-notes-wrap" id="cart-notes-wrap" style="display:none">
-        <label class="cart-notes-label" for="cart-notes">Notas del pedido</label>
+        <label class="cart-notes-label" for="cart-client-name">Tu nombre</label>
+        <input class="cart-notes-input" id="cart-client-name" type="text" placeholder="¿Cómo te llamás?" style="min-height:unset;resize:none;">
+        <label class="cart-notes-label" for="cart-notes" style="margin-top:.75rem;">Notas del pedido</label>
         <textarea class="cart-notes-input" id="cart-notes" placeholder="Aclaraciones, dirección de entrega, horario preferido..."></textarea>
       </div>
     </div>
@@ -1755,7 +1757,7 @@ function renderCart(){
     const _pool2=_allProducts.length>0?_allProducts:db.products;
     const p=_pool2.find(x=>x.id===item.id); if(!p) return '';
     const sub=p.price*item.qty; total+=sub;
-    rowsHtml+=`<div class="summary-row"><span>${esc(p.name)} x${item.qty}</span><span>$${fmt(sub)}</span></div>`;
+    rowsHtml+=`<div class="summary-row"><span>${esc(p.name)} ${item.qty}-</span><span>$${fmt(sub)}</span></div>`;
     const imgHtml=p.imgUrl
       ?`<img src="${esc(p.imgUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cart-item-emoji" style="display:none">${p.emoji||'📦'}</div>`
       :`<div class="cart-item-emoji">${p.emoji||'📦'}</div>`;
@@ -1782,14 +1784,17 @@ function renderCart(){
 
 // Texto limpio para copiar — sin aviso
 function buildOrderText(){
-  const lines=['PEDIDO - Distribuidora Oro Verde',''];
   const _pool3=_allProducts.length>0?_allProducts:db.products;
-  cart.forEach(item=>{const p=_pool3.find(x=>x.id===item.id);if(p)lines.push(item.qty+'x '+p.name+'   $'+fmt(p.price*item.qty));});
+  const name=(document.getElementById('cart-client-name')?.value||'').trim();
+  const lines=['🛒 PEDIDO - Distribuidora Oro Verde'];
+  if(name) lines.push('👤 Cliente: '+name);
+  lines.push('');
+  cart.forEach(item=>{const p=_pool3.find(x=>x.id===item.id);if(p)lines.push('*'+item.qty+'*- '+p.name+'   $'+fmt(p.price*item.qty));});
   const total=cart.reduce((s,x)=>{const p=_pool3.find(q=>q.id===x.id);return s+(p?p.price*x.qty:0);},0);
   const notes=(document.getElementById('cart-notes').value||'').trim();
   lines.push('');
   lines.push('Total estimado: $'+fmt(total));
-  if(notes){ lines.push(''); lines.push('Notas: '+notes); }
+  if(notes){ lines.push(''); lines.push('📝 Notas: '+notes); }
   return lines.join('\n');
 }
 function openCopyModal(){
