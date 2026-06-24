@@ -11,7 +11,7 @@
 :root{
   --gd:#1a3a2a;--gm:#2d6a4f;--gb:#52b788;--gl:#d8f3dc;
   --gold:#e9c46a;--goldd:#b8952a;
-  --cream:#faf8f3;--creamd:#f0ebe0;
+  --cream:#f0ede4;--creamd:#e4dfd3;
   --td:#1a2418;--tm:#4a5a44;--tl:#8a9a84;
   --white:#fff;--red:#e63946;--redbg:#fff0f0;
   --ssm:0 2px 8px rgba(26,58,42,.08);
@@ -191,6 +191,16 @@ a{text-decoration:none;color:inherit;}
 .pin-box{padding:2.25rem 1.75rem 1.75rem;width:min(340px,92vw);text-align:center;}
 .pin-box h2{font-size:1.35rem;color:var(--gd);margin-bottom:.3rem;}
 .pin-subtitle{color:var(--tl);font-size:.82rem;margin-bottom:1.35rem;min-height:.9rem;}
+
+/* Contact Modal */
+.contact-box{padding:1.9rem 1.6rem;width:min(420px,92vw);max-height:88vh;overflow-y:auto;}
+.contact-box h2{font-size:1.3rem;color:var(--gd);margin-bottom:.25rem;font-family:'Fraunces',serif;}
+.contact-box .pin-subtitle{text-align:left;margin-bottom:1.2rem;}
+.contact-box .form-group{margin-bottom:.9rem;}
+.contact-box textarea.form-input{min-height:80px;resize:vertical;}
+.contact-box .pin-error-msg{margin-bottom:.3rem;}
+.contact-box .pin-close{text-align:center;margin-top:.6rem;cursor:pointer;color:var(--tl);font-size:.82rem;padding:8px;}
+.contact-box .pin-close:hover{color:var(--td);}
 .pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:1.35rem;}
 .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid #ccc;background:transparent;transition:background .15s,border-color .15s;}
 .pin-dot.filled{background:var(--gm);border-color:var(--gm);}
@@ -467,6 +477,7 @@ tr.dragging{opacity:.4;}
   .view{padding:.75rem .85rem;}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
 
@@ -475,6 +486,34 @@ tr.dragging{opacity:.4;}
   <div class="loader-name">Oro Verde</div>
   <div class="loader-sub">Distribuidora</div>
   <div class="loader-bar"><div class="loader-fill"></div></div>
+</div>
+
+<!-- Contact Modal -->
+<div id="contact-overlay" class="modal-overlay">
+  <div class="modal-bg" onclick="closeContactModal()"></div>
+  <div class="modal-box contact-box">
+    <h2>Dejanos tus datos</h2>
+    <p class="pin-subtitle">Te vamos a contactar a la brevedad</p>
+    <div class="form-group">
+      <label class="form-label">Nombre</label>
+      <input class="form-input" id="contact-name" type="text" placeholder="Tu nombre completo">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Teléfono</label>
+      <input class="form-input" id="contact-phone" type="tel" placeholder="Ej: 343 1234567">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email (opcional)</label>
+      <input class="form-input" id="contact-email" type="email" placeholder="tu@email.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mensaje</label>
+      <textarea class="form-input cart-notes-input" id="contact-message" placeholder="¿En qué te podemos ayudar?"></textarea>
+    </div>
+    <div id="contact-error" class="pin-error-msg"></div>
+    <button class="btn-submit" id="contact-submit-btn" onclick="sendContactForm()" style="width:100%;margin-top:.5rem;">Enviar</button>
+    <div class="pin-close" onclick="closeContactModal()">Cancelar</div>
+  </div>
 </div>
 
 <!-- PIN Modal -->
@@ -611,6 +650,10 @@ tr.dragging{opacity:.4;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
         <span class="nav-label">Carrito</span>
         <span class="cart-badge" id="cart-badge" style="display:none">0</span>
+      </button>
+      <button class="nav-btn" id="nav-contact" onclick="openContactModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span class="nav-label">Contacto</span>
       </button>
       <button class="nav-btn" id="nav-admin" onclick="handleAdminClick()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
@@ -919,6 +962,14 @@ tr.dragging{opacity:.4;}
 // ═══════════════════════════════════════════
 const SB_URL = 'https://keelsfvowejxdtyukdwm.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZWxzZnZvd2VqeGR0eXVrZHdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDQxMTMsImV4cCI6MjA5NDI4MDExM30.oCrJO0qyyS9MrXvrUsNUWN-ay5RZ4k0cCyWXYtsG8uo';
+
+// ═══════════════════════════════════════════
+//  📧 EMAILJS CONFIG — pegá tus credenciales aquí
+//  (ver emailjs.com → Email Services / Email Templates / Account → API Keys)
+// ═══════════════════════════════════════════
+const EMAILJS_PUBLIC_KEY  = 'jX-zKAJnQeKoNsPuk';
+const EMAILJS_SERVICE_ID  = 'service_2xy4d42';
+const EMAILJS_TEMPLATE_ID = 'template_muufxve';
 
 // ═══════════════════════════════════════════
 //  CONSTANTS (locales — no van a Supabase)
@@ -1442,6 +1493,64 @@ function saveBanner(){
     .then(()=>{ closeBannerModal(); applyBanner(); showToast('Banner actualizado'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
+// ═══════════════════════════════════════════
+//  CONTACT FORM (EmailJS)
+// ═══════════════════════════════════════════
+let _emailjsReady = false;
+function _initEmailJS(){
+  if(_emailjsReady) return;
+  if(typeof emailjs==='undefined') return;
+  if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')) return; // not configured yet
+  try{ emailjs.init(EMAILJS_PUBLIC_KEY); _emailjsReady=true; }catch{}
+}
+function openContactModal(){
+  _initEmailJS();
+  document.getElementById('contact-error').textContent='';
+  document.getElementById('contact-overlay').classList.add('show');
+}
+function closeContactModal(){
+  document.getElementById('contact-overlay').classList.remove('show');
+}
+function sendContactForm(){
+  const name    = document.getElementById('contact-name').value.trim();
+  const phone   = document.getElementById('contact-phone').value.trim();
+  const email   = document.getElementById('contact-email').value.trim();
+  const message = document.getElementById('contact-message').value.trim();
+  const errEl   = document.getElementById('contact-error');
+  const btn     = document.getElementById('contact-submit-btn');
+
+  if(!name || !phone){ errEl.textContent='Completá al menos nombre y teléfono.'; return; }
+  if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')){
+    errEl.textContent='El formulario de contacto todavía no fue configurado.';
+    return;
+  }
+  if(typeof emailjs==='undefined'){
+    errEl.textContent='No se pudo cargar el servicio de email. Revisá tu conexión.';
+    return;
+  }
+  errEl.textContent='';
+  btn.disabled=true; btn.textContent='Enviando...';
+
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    from_name:  name,
+    from_phone: phone,
+    from_email: email || 'No proporcionado',
+    message:    message || 'Sin mensaje adicional',
+  }).then(()=>{
+    btn.disabled=false; btn.textContent='Enviar';
+    closeContactModal();
+    document.getElementById('contact-name').value='';
+    document.getElementById('contact-phone').value='';
+    document.getElementById('contact-email').value='';
+    document.getElementById('contact-message').value='';
+    showToast('¡Mensaje enviado! Te vamos a contactar pronto.','success');
+  }).catch(e=>{
+    btn.disabled=false; btn.textContent='Enviar';
+    errEl.textContent='No se pudo enviar. Probá de nuevo en unos minutos.';
+  });
+}
+
+
 function applyBanner(){
   const b=db.banner||{}; const el=document.getElementById('promo-banner');
   if(b.active && b.text){
