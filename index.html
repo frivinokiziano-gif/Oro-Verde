@@ -1580,7 +1580,7 @@ function onSearchInput(){
 // ═══════════════════════════════════════════
 //  CATALOG
 // ═══════════════════════════════════════════
-function renderCatalog(){
+function renderCatalog(appendMode=false){
   renderFilterChips();
   const grid        = document.getElementById('product-grid');
   const empty       = document.getElementById('empty-catalog');
@@ -1651,47 +1651,18 @@ function renderCatalog(){
     });
   }
 
-  grid.innerHTML=paginated.map(p=>{
-    const imgHtml=p.imgUrl
-      ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'\u{1F4E6}'}</div>`
-      :`<div class="card-emoji">${p.emoji||'\u{1F4E6}'}</div>`;
-    const ci=cart.find(c=>c.id===p.id); const qty=ci?ci.qty:0;
-    const tagsHtml=renderTagChips(p.tags||[]);
-    let relatedHtml='';
-    if(relatedMap.size){
-      const related=(relatedMap.get(p.category)||[]).filter(x=>x.id!==p.id).slice(0,3);
-      if(related.length) relatedHtml=`<div class="related-section"><div class="related-title">También te puede interesar</div><div class="related-chips">${related.map(r=>`<span class="related-chip" onclick="scrollToProduct('${r.id}')">${esc(r.name)}</span>`).join('')}</div></div>`;
-    }
-    return `<div class="product-card${p.inStock?'':' out-of-stock'}" id="card-${p.id}">
-      <div class="card-img-wrap">${imgHtml}
-        <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'\u2713':'\u2717'}</span>
-      </div>
-      <div class="card-body">
-        ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` \u203a ${esc(p.subcategory)}`:''}</div>`:''}
-        <div class="card-name">${esc(p.name)}</div>
-        ${p.desc?`<div class="card-desc">${esc(p.desc)}</div>`:''}
-        ${tagsHtml?`<div class="card-tags">${tagsHtml}</div>`:''}
-        <div class="card-price">$${fmt(p.price)}</div>
-      </div>
-      ${relatedHtml}
-      <div class="card-footer">
-        ${qty>0
-          ?`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
-              <button class="qty-btn" onclick="changeQty('${p.id}',-1)">\u2212</button>
-              <input type="number" class="qty-val" value="${qty}" min="1"
-                onchange="setQty('${p.id}',this.value)"
-                onfocus="this.select()">
-              <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
-              <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">\u2715</button>
-            </div>`
-          :`<button class="btn-add-cart" onclick="addToCart('${p.id}')" ${p.inStock?'':'disabled'}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-              ${p.inStock?'Agregar':'Agotado'}
-            </button>`
-        }
-      </div>
-    </div>`;
-  }).join('');
+  if(appendMode){
+    // Append new cards to existing grid (infinite scroll)
+    const frag = document.createDocumentFragment();
+    paginated.forEach(p=>{
+      const div = document.createElement('div');
+      div.innerHTML = renderProductCard(p);
+      frag.appendChild(div.firstElementChild);
+    });
+    grid.appendChild(frag);
+  } else {
+    grid.innerHTML=paginated.map(p=>renderProductCard(p)).join('');
+  }
 
   if(totalPages<=1){ paginationEl.style.display='none'; return; }
   paginationEl.style.display='flex';
@@ -1705,11 +1676,46 @@ function renderCatalog(){
       pages+=`<span class="page-info">…</span>`;
   }
   pages+=`<button class="page-btn page-btn-next" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Siguiente ›</button>`;
-  // Calculate correct from/to based on actual page data received
   const showing_from = serverTotal === 0 ? 0 : (currentPage-1)*PAGE_SIZE + 1;
   const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
   pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
   paginationEl.innerHTML=pages;
+}
+
+function renderProductCard(p){
+  const imgHtml=p.imgUrl
+    ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'\u{1F4E6}'}</div>`
+    :`<div class="card-emoji">${p.emoji||'\u{1F4E6}'}</div>`;
+  const ci=cart.find(c=>c.id===p.id); const qty=ci?ci.qty:0;
+  const tagsHtml=renderTagChips(p.tags||[]);
+  return `<div class="product-card${p.inStock?'':' out-of-stock'}" id="card-${p.id}">
+    <div class="card-img-wrap">${imgHtml}
+      <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'\u2713':'\u2717'}</span>
+    </div>
+    <div class="card-body">
+      ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` \u203a ${esc(p.subcategory)}`:''}</div>`:''}
+      <div class="card-name">${esc(p.name)}</div>
+      ${p.desc?`<div class="card-desc">${esc(p.desc)}</div>`:''}
+      ${tagsHtml?`<div class="card-tags">${tagsHtml}</div>`:''}
+      <div class="card-price">$${fmt(p.price)}</div>
+    </div>
+    <div class="card-footer">
+      ${qty>0
+        ?`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
+            <button class="qty-btn" onclick="changeQty('${p.id}',-1)">\u2212</button>
+            <input type="number" class="qty-val" value="${qty}" min="1"
+              onchange="setQty('${p.id}',this.value)"
+              onfocus="this.select()">
+            <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
+            <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">\u2715</button>
+          </div>`
+        :`<button class="btn-add-cart" onclick="addToCart('${p.id}')" ${p.inStock?'':'disabled'}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            ${p.inStock?'Agregar':'Agotado'}
+          </button>`
+      }
+    </div>
+  </div>`;
 }
 
 function goPage(n){
@@ -3005,9 +3011,15 @@ document.addEventListener('DOMContentLoaded',()=>{
       _scrollLoading = true;
       currentPage++;
       const q = (document.getElementById('search-input')?.value||'').trim();
-      const promise = (sbConfigured && !q) ? loadFromSupabase(false) : Promise.resolve(renderCatalog());
-      Promise.resolve(promise).finally(()=>{ _scrollLoading=false; });
-    }, { rootMargin: '200px' });
+      const scrollY = window.scrollY;
+      const promise = (sbConfigured && !q)
+        ? loadFromSupabase(false).then(()=>{ renderCatalog(true); })
+        : Promise.resolve(renderCatalog(true));
+      Promise.resolve(promise).finally(()=>{
+        window.scrollTo({top: scrollY, behavior: 'instant'});
+        _scrollLoading=false;
+      });
+    }, { rootMargin: '300px' });
     obs.observe(sentinel);
   }
 });
