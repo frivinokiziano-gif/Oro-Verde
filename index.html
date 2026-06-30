@@ -1085,7 +1085,8 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 // ═══════════════════════════════════════════
 const EMAILJS_PUBLIC_KEY  = 'jX-zKAJnQeKoNsPuk';
 const EMAILJS_SERVICE_ID  = 'service_2xy4d42';
-const EMAILJS_TEMPLATE_ID = 'template_muufxve';
+const EMAILJS_TEMPLATE_ID         = 'template_muufxve'; // formulario de contacto
+const EMAILJS_NOVENDOR_TEMPLATE_ID = 'template_bsi5l4q'; // pedido sin vendedor
 
 // ═══════════════════════════════════════════
 //  CONSTANTS (locales — no van a Supabase)
@@ -1668,11 +1669,11 @@ function sendNoVendorForm(){
   if(typeof emailjs==='undefined'||!_emailjsReady){ errEl.textContent='Servicio de email no disponible. Revisá tu conexión.'; return; }
   errEl.textContent=''; btn.disabled=true; btn.textContent='Enviando...';
   const orderText = buildOrderText();
-  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_NOVENDOR_TEMPLATE_ID, {
     from_name:  name,
     from_phone: phone,
-    from_email: 'Sin email',
-    message:    `PEDIDO SIN VENDEDOR\nDirección: ${address}\n\n${orderText}`,
+    address:    address,
+    order:      orderText,
   }).then(()=>{
     btn.disabled=false; btn.textContent='Enviar';
     closeNoVendorModal();
