@@ -1652,6 +1652,7 @@ function sendToSeller(idx){
 // ── No vendor modal (form → EmailJS) ──
 function openNoVendorModal(){
   if(!cart.length){ showToast('El carrito está vacío','error'); return; }
+  _initEmailJS();
   document.getElementById('nv-error').textContent='';
   document.getElementById('novendor-overlay').classList.add('show');
 }
@@ -1664,6 +1665,7 @@ function sendNoVendorForm(){
   const btn     = document.getElementById('nv-submit-btn');
   if(!name||!phone||!address){ errEl.textContent='Completá todos los campos.'; return; }
   if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')){ errEl.textContent='El servicio de email no está configurado.'; return; }
+  if(typeof emailjs==='undefined'||!_emailjsReady){ errEl.textContent='Servicio de email no disponible. Revisá tu conexión.'; return; }
   errEl.textContent=''; btn.disabled=true; btn.textContent='Enviando...';
   const orderText = buildOrderText();
   emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
@@ -1676,9 +1678,9 @@ function sendNoVendorForm(){
     closeNoVendorModal();
     ['nv-name','nv-phone','nv-address'].forEach(id=>document.getElementById(id).value='');
     showToast('¡Listo! Un vendedor de tu zona te va a contactar pronto.','success');
-  }).catch(()=>{
+  }).catch(e=>{
     btn.disabled=false; btn.textContent='Enviar';
-    errEl.textContent='No se pudo enviar. Intentá de nuevo.';
+    errEl.textContent='Error al enviar: '+(e?.text||e?.message||'Intentá de nuevo.');
   });
 }
 
@@ -1692,8 +1694,19 @@ function openVendorPinModal(){
   document.getElementById('vendor-pin-subtitle').textContent='Ingresá tu PIN de vendedor';
   document.getElementById('vendor-pin-overlay').classList.add('show');
   buildVendorPinKeypad();
+  // Listen for physical keyboard
+  document.addEventListener('keydown', _vendorPinKeyHandler);
 }
-function closeVendorPinModal(){ document.getElementById('vendor-pin-overlay').classList.remove('show'); }
+function closeVendorPinModal(){
+  document.getElementById('vendor-pin-overlay').classList.remove('show');
+  document.removeEventListener('keydown', _vendorPinKeyHandler);
+}
+function _vendorPinKeyHandler(e){
+  if(e.key>='0'&&e.key<='9')      handleVendorPinKey(e.key);
+  else if(e.key==='Backspace')     handleVendorPinKey('←');
+  else if(e.key==='Enter')         handleVendorPinKey('✓');
+  else if(e.key==='Escape')        closeVendorPinModal();
+}
 function renderVendorPinDots(){
   const el=document.getElementById('vendor-pin-dots');
   if(!el) return;
@@ -1781,10 +1794,10 @@ function saveCompanyWsp(){
 
 let _emailjsReady = false;
 function _initEmailJS(){
-  if(_emailjsReady) return;
-  if(typeof emailjs==='undefined') return;
-  if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')) return; // not configured yet
-  try{ emailjs.init(EMAILJS_PUBLIC_KEY); _emailjsReady=true; }catch{}
+  if(_emailjsReady) return true;
+  if(typeof emailjs==='undefined') return false;
+  if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')) return false;
+  try{ emailjs.init(EMAILJS_PUBLIC_KEY); _emailjsReady=true; return true; }catch{ return false; }
 }
 function openContactModal(){
   _initEmailJS();
