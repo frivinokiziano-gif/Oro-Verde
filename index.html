@@ -134,10 +134,6 @@ a{text-decoration:none;color:inherit;}
 .related-chip{padding:4px 10px;border-radius:99px;background:var(--creamd);font-size:.72rem;font-weight:500;color:var(--gd);cursor:pointer;transition:background .12s;}
 .related-chip:hover{background:var(--gl);}
 
-@media(max-width:699px){
-  .pagination .page-btn:not(.page-btn-prev):not(.page-btn-next){ display:none; }
-  .pagination{ gap:.35rem; }
-}
 .page-btn{padding:7px 13px;border-radius:var(--rmd);border:1.5px solid var(--creamd);background:var(--white);font-size:.82rem;font-weight:600;color:var(--tm);cursor:pointer;transition:all .15s;}
 .page-btn:hover:not(:disabled){border-color:var(--gm);color:var(--gm);}
 .page-btn.active{background:var(--gd);color:var(--white);border-color:var(--gd);}
@@ -177,6 +173,23 @@ a{text-decoration:none;color:inherit;}
 .btn-copy-order{width:100%;padding:7px 12px;border-radius:var(--rmd);background:var(--gd);color:var(--white);font-size:.78rem;font-weight:600;margin-bottom:.55rem;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.35rem;}
 .btn-copy-order svg{width:12px;height:12px;}
 .btn-copy-order:hover{background:var(--gm);}
+.wsp-section{margin:.55rem 0;display:flex;flex-direction:column;gap:.45rem;}
+.wsp-section-title{font-size:.72rem;font-weight:700;color:var(--tl);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.1rem;}
+.btn-wsp{width:100%;padding:10px 14px;border-radius:var(--rmd);font-size:.84rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:all .15s;cursor:pointer;}
+.btn-wsp-seller{background:#25d366;color:#fff;border:none;}
+.btn-wsp-seller:hover{background:#1da851;}
+.btn-wsp-novendor{background:var(--white);color:var(--gd);border:2px solid var(--gm);}
+.btn-wsp-novendor:hover{background:var(--gl);}
+.btn-wsp-isvendor{background:var(--white);color:var(--tm);border:2px solid var(--creamd);}
+.btn-wsp-isvendor:hover{background:var(--creamd);}
+.seller-btn{width:100%;padding:12px 16px;border-radius:var(--rmd);background:var(--white);border:1.5px solid var(--creamd);font-size:.88rem;font-weight:600;color:var(--td);display:flex;align-items:center;gap:.75rem;cursor:pointer;transition:all .15s;margin-bottom:.45rem;}
+.seller-btn:hover{border-color:var(--gm);background:var(--gl);color:var(--gd);}
+.seller-btn svg{color:#25d366;flex-shrink:0;}
+.seller-admin-row{display:flex;align-items:center;gap:.5rem;padding:.5rem .6rem;border-radius:var(--rsm);background:var(--cream);margin-bottom:.4rem;}
+.seller-admin-name{flex:1;font-weight:600;font-size:.84rem;}
+.seller-admin-phone{color:var(--tl);font-size:.78rem;}
+.seller-admin-del{background:none;border:none;color:var(--tl);cursor:pointer;padding:3px 6px;border-radius:4px;font-size:.9rem;}
+.seller-admin-del:hover{color:var(--red);background:var(--redbg);}
 .btn-clear-cart{width:100%;padding:9px;border-radius:var(--rmd);border:2px solid var(--red);background:transparent;color:var(--red);font-size:.845rem;font-weight:600;transition:background .15s,color .15s;}
 .btn-clear-cart:hover{background:var(--red);color:var(--white);}
 
@@ -488,6 +501,54 @@ tr.dragging{opacity:.4;}
   <div class="loader-bar"><div class="loader-fill"></div></div>
 </div>
 
+<!-- Seller Selector Modal -->
+<div id="seller-overlay" class="modal-overlay">
+  <div class="modal-bg" onclick="closeSellerModal()"></div>
+  <div class="modal-box contact-box">
+    <h2>Elegí tu vendedor</h2>
+    <p class="pin-subtitle">Te vamos a redirigir a WhatsApp con tu pedido</p>
+    <div id="seller-list"></div>
+    <div class="pin-close" onclick="closeSellerModal()">Cancelar</div>
+  </div>
+</div>
+
+<!-- No Vendor Modal -->
+<div id="novendor-overlay" class="modal-overlay">
+  <div class="modal-bg" onclick="closeNoVendorModal()"></div>
+  <div class="modal-box contact-box">
+    <h2>Dejanos tus datos</h2>
+    <p class="pin-subtitle">Un vendedor de tu zona se va a comunicar pronto</p>
+    <div class="form-group">
+      <label class="form-label">Nombre</label>
+      <input class="form-input" id="nv-name" type="text" placeholder="Tu nombre completo">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Teléfono</label>
+      <input class="form-input" id="nv-phone" type="tel" placeholder="Ej: 343 1234567" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9\s\+\-]/g,'')">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Dirección</label>
+      <input class="form-input" id="nv-address" type="text" placeholder="Calle, número, barrio">
+    </div>
+    <div id="nv-error" class="pin-error-msg"></div>
+    <button class="btn-submit" id="nv-submit-btn" onclick="sendNoVendorForm()" style="width:100%;margin-top:.5rem;">Enviar</button>
+    <div class="pin-close" onclick="closeNoVendorModal()">Cancelar</div>
+  </div>
+</div>
+
+<!-- Vendor PIN Modal -->
+<div id="vendor-pin-overlay" class="modal-overlay">
+  <div class="modal-bg" onclick="closeVendorPinModal()"></div>
+  <div class="modal-box pin-box">
+    <h2>Acceso Vendedor</h2>
+    <p class="pin-subtitle" id="vendor-pin-subtitle">Ingresá tu PIN de vendedor</p>
+    <div class="pin-dots" id="vendor-pin-dots"></div>
+    <div class="pin-keypad" id="vendor-pin-keypad"></div>
+    <div class="pin-error-msg" id="vendor-pin-error"></div>
+    <div class="pin-close" onclick="closeVendorPinModal()">Cancelar</div>
+  </div>
+</div>
+
 <!-- Contact Modal -->
 <div id="contact-overlay" class="modal-overlay">
   <div class="modal-bg" onclick="closeContactModal()"></div>
@@ -685,7 +746,6 @@ tr.dragging{opacity:.4;}
 <!-- Catalog View -->
 <div class="view active" id="view-catalog">
   <div class="product-grid" id="product-grid"></div>
-  <div id="scroll-sentinel" style="height:1px;margin-top:-1px;"></div>
   <div class="pagination" id="pagination" style="display:none"></div>
   <div class="empty-state" id="empty-catalog" style="display:none">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
@@ -725,6 +785,21 @@ tr.dragging{opacity:.4;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         Copiar pedido
       </button>
+      <div class="wsp-section">
+        <div class="wsp-section-title">Enviar por WhatsApp</div>
+        <button class="btn-wsp btn-wsp-seller" onclick="openSellerModal()">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.413A9.953 9.953 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+          Tengo vendedor
+        </button>
+        <button class="btn-wsp btn-wsp-novendor" onclick="openNoVendorModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>
+          No tengo vendedor
+        </button>
+        <button class="btn-wsp btn-wsp-isvendor" onclick="openVendorPinModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Soy vendedor
+        </button>
+      </div>
       <button class="btn-clear-cart" onclick="clearCart()">Vaciar carrito</button>
     </div>
   </div>
@@ -750,6 +825,7 @@ tr.dragging{opacity:.4;}
     <button class="admin-tab"        id="atab-cats"    onclick="switchAdminTab('cats')">Categorías y tags</button>
     <button class="admin-tab"        id="atab-io"      onclick="switchAdminTab('io')">Importar / Exportar</button>
     <button class="admin-tab"        id="atab-stats"   onclick="switchAdminTab('stats')">Estadísticas</button>
+    <button class="admin-tab"        id="atab-sellers" onclick="switchAdminTab('sellers')">Vendedores</button>
   </div>
 
   <!-- Panel: list -->
@@ -947,6 +1023,46 @@ tr.dragging{opacity:.4;}
   <div class="admin-panel" id="apanel-stats">
     <div id="stats-detail"></div>
   </div>
+
+  <!-- Panel: sellers -->
+  <div class="admin-panel" id="apanel-sellers">
+    <div class="io-card">
+      <div class="form-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Vendedores
+      </div>
+      <p class="io-hint">Cada vendedor tiene un nombre y su número de WhatsApp (solo números, sin espacios ni +). Al cliente le va a aparecer esta lista para elegir.</p>
+      <div id="sellers-list-admin"></div>
+      <div class="seller-add-row" style="margin-top:.85rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+        <input class="form-input" id="seller-name-inp" type="text" placeholder="Nombre del vendedor" style="flex:1;min-width:140px;">
+        <input class="form-input" id="seller-phone-inp" type="tel" placeholder="WhatsApp (ej: 543431234567)" inputmode="numeric" style="flex:1;min-width:160px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+        <button class="btn-submit" onclick="addSeller()" style="width:auto;padding:9px 18px;">Agregar</button>
+      </div>
+    </div>
+    <div class="io-card" style="margin-top:1rem;">
+      <div class="form-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        PIN de vendedor
+      </div>
+      <p class="io-hint">PIN de 6 dígitos que los vendedores usan para enviar el pedido directamente a la empresa por WhatsApp.</p>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <input class="form-input" id="vendor-pin-new" type="password" placeholder="Nuevo PIN (6 dígitos)" maxlength="6" inputmode="numeric" style="flex:1;min-width:160px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+        <button class="btn-submit" onclick="saveVendorPin()" style="width:auto;padding:9px 18px;">Guardar PIN</button>
+      </div>
+    </div>
+    <div class="io-card" style="margin-top:1rem;">
+      <div class="form-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+        WhatsApp de la empresa
+      </div>
+      <p class="io-hint">Número al que llega el pedido cuando un vendedor usa "Soy vendedor".</p>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <input class="form-input" id="company-wsp-inp" type="tel" placeholder="Ej: 543431234567" inputmode="numeric" style="flex:1;min-width:160px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+        <button class="btn-submit" onclick="saveCompanyWsp()" style="width:auto;padding:9px 18px;">Guardar</button>
+      </div>
+      <div id="company-wsp-current" class="io-hint" style="margin-top:.5rem;"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Floating cart button -->
@@ -1131,7 +1247,8 @@ function getEmptyDB(){
     {name:'Snacks',    subs:['Dulces','Salados']},
     {name:'Limpieza',  subs:[]},
     {name:'Almacén',   subs:[]},
-  ], banner:{text:'',bg:'#e9c46a',fg:'#1a3a2a',active:false} };
+  ], banner:{text:'',bg:'#e9c46a',fg:'#1a3a2a',active:false},
+  sellers:[], vendor_pin_hash:'', company_wsp:'' };
 }
 
 // ─── Supabase row ↔ app object mappers ───
@@ -1180,14 +1297,20 @@ async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
   try {
     if(fullReload){
-      const [cats, banner, pinHash] = await Promise.all([
+      const [cats, banner, pinHash, sellers, vendorPin, companyWsp] = await Promise.all([
         sb.getConfig('categories'),
         sb.getConfig('banner'),
         sb.getConfig('pin_hash'),
+        sb.getConfig('sellers'),
+        sb.getConfig('vendor_pin_hash'),
+        sb.getConfig('company_wsp'),
       ]);
-      if(cats)    db.categories = cats;
-      if(banner)  db.banner     = banner;
-      if(pinHash) localStorage.setItem(PIN_HASH_KEY, pinHash);
+      if(cats)       db.categories      = cats;
+      if(banner)     db.banner          = banner;
+      if(pinHash)    localStorage.setItem(PIN_HASH_KEY, pinHash);
+      if(sellers)    db.sellers         = sellers;
+      if(vendorPin)  db.vendor_pin_hash = vendorPin;
+      if(companyWsp) db.company_wsp     = companyWsp;
     }
 
     // Always load ALL products (bypasses 1000-row limit) — used by admin + stats + search
@@ -1241,12 +1364,14 @@ async function loadFromSupabase(fullReload=true){
       try {
         const newCount = await sb.count('products','order=sort_order.asc');
         // Also check if categories or banner changed
-        const [newCats, newBanner] = await Promise.all([
+        const [newCats, newBanner, newSellers] = await Promise.all([
           sb.getConfig('categories'),
           sb.getConfig('banner'),
+          sb.getConfig('sellers'),
         ]);
-        const catsChanged = JSON.stringify(newCats) !== JSON.stringify(db.categories);
-        const bannerChanged = JSON.stringify(newBanner) !== JSON.stringify(db.banner);
+        const catsChanged   = JSON.stringify(newCats)    !== JSON.stringify(db.categories);
+        const bannerChanged = JSON.stringify(newBanner)  !== JSON.stringify(db.banner);
+        const sellersChanged= JSON.stringify(newSellers) !== JSON.stringify(db.sellers);
         if(catsChanged){
           db.categories = newCats || db.categories;
           renderFilterChips(); renderCatChips(); renderCategorySelect();
@@ -1254,6 +1379,9 @@ async function loadFromSupabase(fullReload=true){
         if(bannerChanged){
           db.banner = newBanner || db.banner;
           applyBanner();
+        }
+        if(sellersChanged){
+          db.sellers = newSellers || db.sellers;
         }
         if(newCount !== null && newCount !== _totalProducts){
           await loadFromSupabase(true);
@@ -1494,8 +1622,163 @@ function saveBanner(){
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
 // ═══════════════════════════════════════════
-//  CONTACT FORM (EmailJS)
+//  SELLERS & VENDOR
 // ═══════════════════════════════════════════
+
+// ── Seller modal (choose seller → WhatsApp) ──
+function openSellerModal(){
+  if(!cart.length){ showToast('El carrito está vacío','error'); return; }
+  const list = document.getElementById('seller-list');
+  const sellers = db.sellers||[];
+  if(!sellers.length){
+    list.innerHTML='<p style="color:var(--tl);text-align:center;padding:1rem;">No hay vendedores configurados todavía.</p>';
+  } else {
+    list.innerHTML = sellers.map((s,i)=>`
+      <button class="seller-btn" onclick="sendToSeller(${i})">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.413A9.953 9.953 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+        ${esc(s.name)}
+      </button>`).join('');
+  }
+  document.getElementById('seller-overlay').classList.add('show');
+}
+function closeSellerModal(){ document.getElementById('seller-overlay').classList.remove('show'); }
+function sendToSeller(idx){
+  const seller = (db.sellers||[])[idx]; if(!seller) return;
+  const text = encodeURIComponent(buildOrderText());
+  window.open(`https://wa.me/${seller.phone}?text=${text}`, '_blank');
+  closeSellerModal();
+}
+
+// ── No vendor modal (form → EmailJS) ──
+function openNoVendorModal(){
+  if(!cart.length){ showToast('El carrito está vacío','error'); return; }
+  document.getElementById('nv-error').textContent='';
+  document.getElementById('novendor-overlay').classList.add('show');
+}
+function closeNoVendorModal(){ document.getElementById('novendor-overlay').classList.remove('show'); }
+function sendNoVendorForm(){
+  const name    = document.getElementById('nv-name').value.trim();
+  const phone   = document.getElementById('nv-phone').value.trim();
+  const address = document.getElementById('nv-address').value.trim();
+  const errEl   = document.getElementById('nv-error');
+  const btn     = document.getElementById('nv-submit-btn');
+  if(!name||!phone||!address){ errEl.textContent='Completá todos los campos.'; return; }
+  if(EMAILJS_PUBLIC_KEY.includes('PEGAR_')){ errEl.textContent='El servicio de email no está configurado.'; return; }
+  errEl.textContent=''; btn.disabled=true; btn.textContent='Enviando...';
+  const orderText = buildOrderText();
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    from_name:  name,
+    from_phone: phone,
+    from_email: 'Sin email',
+    message:    `PEDIDO SIN VENDEDOR\nDirección: ${address}\n\n${orderText}`,
+  }).then(()=>{
+    btn.disabled=false; btn.textContent='Enviar';
+    closeNoVendorModal();
+    ['nv-name','nv-phone','nv-address'].forEach(id=>document.getElementById(id).value='');
+    showToast('¡Listo! Un vendedor de tu zona te va a contactar pronto.','success');
+  }).catch(()=>{
+    btn.disabled=false; btn.textContent='Enviar';
+    errEl.textContent='No se pudo enviar. Intentá de nuevo.';
+  });
+}
+
+// ── Vendor PIN modal (vendor → WhatsApp empresa) ──
+let _vendorPinBuffer = '';
+function openVendorPinModal(){
+  if(!cart.length){ showToast('El carrito está vacío','error'); return; }
+  _vendorPinBuffer='';
+  renderVendorPinDots();
+  document.getElementById('vendor-pin-error').textContent='';
+  document.getElementById('vendor-pin-subtitle').textContent='Ingresá tu PIN de vendedor';
+  document.getElementById('vendor-pin-overlay').classList.add('show');
+  buildVendorPinKeypad();
+}
+function closeVendorPinModal(){ document.getElementById('vendor-pin-overlay').classList.remove('show'); }
+function renderVendorPinDots(){
+  const el=document.getElementById('vendor-pin-dots');
+  if(!el) return;
+  el.innerHTML=[...Array(6)].map((_,i)=>`<span class="pin-dot${i<_vendorPinBuffer.length?' filled':''}"></span>`).join('');
+}
+function buildVendorPinKeypad(){
+  const kp=document.getElementById('vendor-pin-keypad');
+  if(!kp||kp.dataset.built) return;
+  kp.dataset.built='1';
+  const keys=['1','2','3','4','5','6','7','8','9','←','0','✓'];
+  kp.innerHTML=keys.map(k=>`<button class="pin-key" onclick="handleVendorPinKey('${k}')">${k}</button>`).join('');
+}
+function handleVendorPinKey(k){
+  if(k==='←'){ _vendorPinBuffer=_vendorPinBuffer.slice(0,-1); renderVendorPinDots(); return; }
+  if(k==='✓'){ checkVendorPin(); return; }
+  if(_vendorPinBuffer.length>=6) return;
+  _vendorPinBuffer+=k; renderVendorPinDots();
+  if(_vendorPinBuffer.length===6) checkVendorPin();
+}
+function checkVendorPin(){
+  const hash = djb2(_vendorPinBuffer);
+  const stored = db.vendor_pin_hash;
+  if(!stored){ document.getElementById('vendor-pin-error').textContent='PIN de vendedor no configurado.'; _vendorPinBuffer=''; renderVendorPinDots(); return; }
+  if(hash !== stored){ document.getElementById('vendor-pin-error').textContent='PIN incorrecto.'; _vendorPinBuffer=''; renderVendorPinDots(); return; }
+  // PIN correct — send to company WhatsApp
+  const companyPhone = db.company_wsp||'';
+  if(!companyPhone){ showToast('WhatsApp de la empresa no configurado','error'); closeVendorPinModal(); return; }
+  const text = encodeURIComponent('🏪 PEDIDO DE VENDEDOR\n'+buildOrderText());
+  closeVendorPinModal();
+  window.open(`https://wa.me/${companyPhone}?text=${text}`, '_blank');
+}
+
+// ── Sellers admin ──
+function renderSellersAdmin(){
+  const list = document.getElementById('sellers-list-admin');
+  const sellers = db.sellers||[];
+  if(!sellers.length){ list.innerHTML='<p class="io-hint">No hay vendedores todavía.</p>'; return; }
+  list.innerHTML = sellers.map((s,i)=>`
+    <div class="seller-admin-row">
+      <span class="seller-admin-name">${esc(s.name)}</span>
+      <span class="seller-admin-phone">${esc(s.phone)}</span>
+      <button class="seller-admin-del" onclick="deleteSeller(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+  // Show current company wsp
+  const cw = document.getElementById('company-wsp-current');
+  if(cw && db.company_wsp) cw.textContent='Actual: '+db.company_wsp;
+  const cwInp = document.getElementById('company-wsp-inp');
+  if(cwInp && db.company_wsp) cwInp.value = db.company_wsp;
+}
+function addSeller(){
+  const name  = document.getElementById('seller-name-inp').value.trim();
+  const phone = document.getElementById('seller-phone-inp').value.trim();
+  if(!name||!phone){ showToast('Completá nombre y teléfono','error'); return; }
+  if(!db.sellers) db.sellers=[];
+  db.sellers.push({name, phone});
+  saveConfig('sellers', db.sellers)
+    .then(()=>{ renderSellersAdmin(); document.getElementById('seller-name-inp').value=''; document.getElementById('seller-phone-inp').value=''; showToast('Vendedor agregado'); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+function deleteSeller(idx){
+  db.sellers.splice(idx,1);
+  saveConfig('sellers', db.sellers)
+    .then(()=>{ renderSellersAdmin(); showToast('Vendedor eliminado'); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+function saveVendorPin(){
+  const pin = document.getElementById('vendor-pin-new').value.trim();
+  if(pin.length!==6||!/^\d{6}$/.test(pin)){ showToast('El PIN debe tener exactamente 6 dígitos','error'); return; }
+  const hash = djb2(pin);
+  db.vendor_pin_hash = hash;
+  saveConfig('vendor_pin_hash', hash)
+    .then(()=>{ document.getElementById('vendor-pin-new').value=''; showToast('PIN de vendedor guardado'); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+function saveCompanyWsp(){
+  const phone = document.getElementById('company-wsp-inp').value.trim();
+  if(!phone){ showToast('Ingresá el número','error'); return; }
+  if(!db.company_wsp) db.company_wsp='';
+  db.company_wsp = phone;
+  saveConfig('company_wsp', phone)
+    .then(()=>{ renderSellersAdmin(); showToast('WhatsApp de empresa guardado'); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+
+
 let _emailjsReady = false;
 function _initEmailJS(){
   if(_emailjsReady) return;
@@ -1580,7 +1863,7 @@ function onSearchInput(){
 // ═══════════════════════════════════════════
 //  CATALOG
 // ═══════════════════════════════════════════
-function renderCatalog(appendMode=false){
+function renderCatalog(){
   renderFilterChips();
   const grid        = document.getElementById('product-grid');
   const empty       = document.getElementById('empty-catalog');
@@ -1651,18 +1934,7 @@ function renderCatalog(appendMode=false){
     });
   }
 
-  if(appendMode){
-    // Append new cards to existing grid (infinite scroll)
-    const frag = document.createDocumentFragment();
-    paginated.forEach(p=>{
-      const div = document.createElement('div');
-      div.innerHTML = renderProductCard(p);
-      frag.appendChild(div.firstElementChild);
-    });
-    grid.appendChild(frag);
-  } else {
-    grid.innerHTML=paginated.map(p=>renderProductCard(p)).join('');
-  }
+  grid.innerHTML=paginated.map(p=>renderProductCard(p)).join('');
 
   if(totalPages<=1){ paginationEl.style.display='none'; return; }
   paginationEl.style.display='flex';
@@ -1959,8 +2231,9 @@ function switchAdminTab(tab){
   document.querySelectorAll('.admin-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('atab-'+tab).classList.add('active');
   document.getElementById('apanel-'+tab).classList.add('active');
-  if(tab==='list')  generateQR();
-  if(tab==='stats') renderStatsDetail();
+  if(tab==='list')    generateQR();
+  if(tab==='stats')   renderStatsDetail();
+  if(tab==='sellers') renderSellersAdmin();
 }
 
 function renderStatsDetail(){
@@ -2992,36 +3265,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(loaderEl){ loaderEl.classList.add('hide'); setTimeout(()=>loaderEl.remove(),400); }
   },700);
   loadFromSupabase();
-
-  // Infinite scroll on mobile — auto-loads next page when sentinel enters viewport
-  let _scrollLoading = false;
-  const sentinel = document.getElementById('scroll-sentinel');
-  if(sentinel && 'IntersectionObserver' in window){
-    const obs = new IntersectionObserver((entries)=>{
-      if(!entries[0].isIntersecting) return;
-      if(_scrollLoading) return;
-      if(currentView !== 'catalog') return;
-      // Only auto-advance on mobile (< 700px)
-      if(window.innerWidth >= 700) return;
-      // Check if there's a next page
-      const paginationEl = document.getElementById('pagination');
-      if(!paginationEl || paginationEl.style.display === 'none') return;
-      const nextBtn = paginationEl.querySelector('.page-btn-next:not(:disabled)');
-      if(!nextBtn) return;
-      _scrollLoading = true;
-      currentPage++;
-      const q = (document.getElementById('search-input')?.value||'').trim();
-      const scrollY = window.scrollY;
-      const promise = (sbConfigured && !q)
-        ? loadFromSupabase(false).then(()=>{ renderCatalog(true); })
-        : Promise.resolve(renderCatalog(true));
-      Promise.resolve(promise).finally(()=>{
-        window.scrollTo({top: scrollY, behavior: 'instant'});
-        _scrollLoading=false;
-      });
-    }, { rootMargin: '300px' });
-    obs.observe(sentinel);
-  }
 });
 </script>
 </body>
