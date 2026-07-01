@@ -138,10 +138,8 @@ a{text-decoration:none;color:inherit;}
 .page-btn:disabled{opacity:.35;cursor:not-allowed;}
 .page-info{font-size:.78rem;color:var(--tl);padding:0 .25rem;}
 @media(max-width:699px){
-  .pagination{gap:.3rem !important;padding:.75rem .5rem;}
-  .page-btn:not(.page-btn-prev):not(.page-btn-next):not(.active){display:none;}
-  .page-btn-prev,.page-btn-next{flex:1;justify-content:center;}
-  .page-btn.active{min-width:42px;text-align:center;}
+  .pagination{gap:.25rem !important;padding:.75rem .4rem;}
+  .page-btn{padding:6px 9px;font-size:.75rem;}
 }
 
 /* Empty */
@@ -1957,7 +1955,7 @@ function renderCatalog(){
   if(totalPages<=1){ paginationEl.style.display='none'; return; }
   paginationEl.style.display='flex';
   let pages='';
-  pages+=`<button class="page-btn page-btn-prev" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Anterior</button>`;
+  pages+=`<button class="page-btn page-btn-prev" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Ant.</button>`;
   const range=2;
   for(let i=1;i<=totalPages;i++){
     if(i===1||i===totalPages||Math.abs(i-currentPage)<=range)
@@ -1965,7 +1963,7 @@ function renderCatalog(){
     else if(Math.abs(i-currentPage)===range+1)
       pages+=`<span class="page-info">…</span>`;
   }
-  pages+=`<button class="page-btn page-btn-next" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Siguiente ›</button>`;
+  pages+=`<button class="page-btn page-btn-next" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Sig. ›</button>`;
   const showing_from = serverTotal === 0 ? 0 : (currentPage-1)*PAGE_SIZE + 1;
   const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
   pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
@@ -2010,8 +2008,14 @@ function renderProductCard(p){
 
 function goPage(n){
   currentPage=n;
-  loadFromSupabase(false); // fetch new page from Supabase
-  document.getElementById('view-catalog').scrollIntoView({behavior:'smooth',block:'start'});
+  loadFromSupabase(false);
+  const header = document.getElementById('main-header');
+  const headerH = header ? header.offsetHeight : 0;
+  const catalog = document.getElementById('view-catalog');
+  if(catalog){
+    const top = catalog.getBoundingClientRect().top + window.scrollY - headerH - 8;
+    window.scrollTo({top: Math.max(0, top), behavior:'smooth'});
+  }
 }
 
 function renderTagChips(tags){
@@ -2147,10 +2151,10 @@ function updateBadge(){
     fab.style.display = visible ? 'flex' : 'none';
     if(fabBadge) fabBadge.textContent=n>99?'99+':n;
     if(visible){
-      // Push FAB above pagination bar if it's visible
       const pag = document.getElementById('pagination');
-      const pagH = (pag && pag.style.display!=='none') ? pag.offsetHeight + 12 : 0;
-      fab.style.bottom = (pagH + 16) + 'px';
+      const pagVisible = pag && pag.style.display!=='none';
+      const pagH = pagVisible ? pag.offsetHeight : 0;
+      fab.style.bottom = (pagH > 0 ? pagH + 8 : 16) + 'px';
     }
   }
 }
