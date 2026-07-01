@@ -1970,6 +1970,24 @@ function renderCatalog(){
   paginationEl.innerHTML=pages;
   // Reposition FAB above pagination after DOM updates
   setTimeout(()=>updateBadge(), 0);
+  // Also reposition on scroll
+  if(!window._fabScrollListener){
+    window._fabScrollListener = true;
+    window.addEventListener('scroll', ()=>{
+      const fab = document.getElementById('fab-cart');
+      if(!fab || fab.style.display==='none') return;
+      const pag = document.getElementById('pagination');
+      if(!pag || pag.style.display==='none'){ fab.style.bottom='16px'; return; }
+      const pagRect = pag.getBoundingClientRect();
+      const winH = window.innerHeight;
+      if(pagRect.top < winH){
+        // pagination is visible on screen — push FAB above it
+        fab.style.bottom = Math.max(16, winH - pagRect.top + 8) + 'px';
+      } else {
+        fab.style.bottom = '16px';
+      }
+    }, {passive:true});
+  }
 }
 
 function renderProductCard(p){
@@ -2147,15 +2165,9 @@ function updateBadge(){
   const fab=document.getElementById('fab-cart');
   const fabBadge=document.getElementById('fab-badge');
   if(fab){
-    const visible = n>0 && currentView==='catalog';
-    fab.style.display = visible ? 'flex' : 'none';
+    fab.style.display=(n>0&&currentView==='catalog')?'flex':'none';
     if(fabBadge) fabBadge.textContent=n>99?'99+':n;
-    if(visible){
-      const pag = document.getElementById('pagination');
-      const pagVisible = pag && pag.style.display!=='none';
-      const pagH = pagVisible ? pag.offsetHeight : 0;
-      fab.style.bottom = (pagH > 0 ? pagH + 8 : 16) + 'px';
-    }
+    fab.style.bottom='16px'; // default, scroll listener adjusts if needed
   }
 }
 function renderCart(){
