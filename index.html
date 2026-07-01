@@ -132,14 +132,20 @@ a{text-decoration:none;color:inherit;}
 .related-chip{padding:4px 10px;border-radius:99px;background:var(--creamd);font-size:.72rem;font-weight:500;color:var(--gd);cursor:pointer;transition:background .12s;}
 .related-chip:hover{background:var(--gl);}
 
-.page-btn{padding:7px 13px;border-radius:var(--rmd);border:1.5px solid var(--creamd);background:var(--white);font-size:.82rem;font-weight:600;color:var(--tm);cursor:pointer;transition:all .15s;}
-.page-btn:hover:not(:disabled){border-color:var(--gm);color:var(--gm);}
+.page-btn{padding:8px 14px;border-radius:var(--rmd);border:1.5px solid var(--creamd);background:var(--white);font-size:.84rem;font-weight:600;color:var(--tm);cursor:pointer;transition:all .15s;min-width:40px;text-align:center;}
+.page-btn:hover:not(:disabled){border-color:var(--gm);color:var(--gm);background:var(--gl);}
 .page-btn.active{background:var(--gd);color:var(--white);border-color:var(--gd);}
 .page-btn:disabled{opacity:.35;cursor:not-allowed;}
+.page-btn-prev,.page-btn-next{min-width:70px;}
+.pagination{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1.5rem .5rem .75rem;}
+.pagination-inner{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:center;}
+.page-ellipsis{color:var(--tl);font-size:.85rem;padding:0 4px;line-height:1;}
+.page-counter{font-size:.75rem;color:var(--tl);font-weight:500;}
 .page-info{font-size:.78rem;color:var(--tl);padding:0 .25rem;}
 @media(max-width:699px){
-  .pagination{gap:.25rem !important;padding:.75rem .4rem;}
-  .page-btn{padding:6px 9px;font-size:.75rem;}
+  .pagination{padding:1rem .4rem .6rem;}
+  .page-btn{padding:7px 10px;font-size:.78rem;min-width:36px;}
+  .page-btn-prev,.page-btn-next{min-width:60px;}
 }
 
 /* Empty */
@@ -1047,6 +1053,7 @@ tr.dragging{opacity:.4;}
         PIN de vendedor
       </div>
       <p class="io-hint">PIN de 6 dígitos que los vendedores usan para enviar el pedido directamente a la empresa por WhatsApp.</p>
+      <div id="vendor-pin-status" class="io-hint" style="font-weight:600;margin-bottom:.5rem;"></div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
         <input class="form-input" id="vendor-pin-new" type="password" placeholder="Nuevo PIN (6 dígitos)" maxlength="6" inputmode="numeric" style="flex:1;min-width:160px;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
         <button class="btn-submit" onclick="saveVendorPin()" style="width:auto;padding:9px 18px;">Guardar PIN</button>
@@ -1300,20 +1307,22 @@ async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
   try {
     if(fullReload){
-      const [cats, banner, pinHash, sellers, vendorPin, companyWsp] = await Promise.all([
+      const [cats, banner, pinHash, sellers, vendorPin, companyWsp, vendorPinPlain] = await Promise.all([
         sb.getConfig('categories'),
         sb.getConfig('banner'),
         sb.getConfig('pin_hash'),
         sb.getConfig('sellers'),
         sb.getConfig('vendor_pin_hash'),
         sb.getConfig('company_wsp'),
+        sb.getConfig('vendor_pin_plain'),
       ]);
-      if(cats)       db.categories      = cats;
-      if(banner)     db.banner          = banner;
-      if(pinHash)    localStorage.setItem(PIN_HASH_KEY, pinHash);
-      if(sellers)    db.sellers         = sellers;
-      if(vendorPin)  db.vendor_pin_hash = vendorPin;
-      if(companyWsp) db.company_wsp     = companyWsp;
+      if(cats)           db.categories      = cats;
+      if(banner)         db.banner          = banner;
+      if(pinHash)        localStorage.setItem(PIN_HASH_KEY, pinHash);
+      if(sellers)        db.sellers         = sellers;
+      if(vendorPin)      db.vendor_pin_hash = vendorPin;
+      if(companyWsp)     db.company_wsp     = companyWsp;
+      if(vendorPinPlain) db.vendor_pin_plain= vendorPinPlain;
     }
 
     // Always load ALL products (bypasses 1000-row limit) — used by admin + stats + search
@@ -1745,16 +1754,26 @@ function checkVendorPin(){
 function renderSellersAdmin(){
   const list = document.getElementById('sellers-list-admin');
   const sellers = db.sellers||[];
-  if(!sellers.length){ list.innerHTML='<p class="io-hint">No hay vendedores todavía.</p>'; return; }
-  list.innerHTML = sellers.map((s,i)=>`
-    <div class="seller-admin-row">
-      <span class="seller-admin-name">${esc(s.name)}</span>
-      <span class="seller-admin-phone">${esc(s.phone)}</span>
-      <button class="seller-admin-del" onclick="deleteSeller(${i})" title="Eliminar">✕</button>
-    </div>`).join('');
-  // Show current company wsp
+  list.innerHTML = sellers.length
+    ? sellers.map((s,i)=>`
+        <div class="seller-admin-row">
+          <span class="seller-admin-name">${esc(s.name)}</span>
+          <span class="seller-admin-phone">${esc(s.phone)}</span>
+          <button class="seller-admin-del" onclick="deleteSeller(${i})" title="Eliminar">✕</button>
+        </div>`).join('')
+    : '<p class="io-hint">No hay vendedores todavía.</p>';
+
+  // Show vendor PIN status
+  const pinEl = document.getElementById('vendor-pin-status');
+  if(pinEl) pinEl.innerHTML = db.vendor_pin_hash
+    ? `<span style="color:var(--gm)">✓ PIN configurado</span> — <span id="vendor-pin-reveal" style="cursor:pointer;text-decoration:underline;color:var(--tl);" onclick="togglePinReveal()">Ver PIN</span><span id="vendor-pin-value" style="display:none;font-family:monospace;font-weight:700;font-size:1rem;color:var(--gd);margin-left:.5rem;"></span>`
+    : '<span style="color:var(--red)">✗ Sin PIN configurado</span>';
+
+  // Show company WhatsApp
   const cw = document.getElementById('company-wsp-current');
-  if(cw && db.company_wsp) cw.textContent='Actual: '+db.company_wsp;
+  if(cw) cw.innerHTML = db.company_wsp
+    ? `<span style="color:var(--gm)">✓ Número actual:</span> <strong>${esc(db.company_wsp)}</strong>`
+    : '<span style="color:var(--red)">✗ Sin número configurado</span>';
   const cwInp = document.getElementById('company-wsp-inp');
   if(cwInp && db.company_wsp) cwInp.value = db.company_wsp;
 }
@@ -1779,9 +1798,25 @@ function saveVendorPin(){
   if(pin.length!==6||!/^\d{6}$/.test(pin)){ showToast('El PIN debe tener exactamente 6 dígitos','error'); return; }
   const hash = djb2(pin);
   db.vendor_pin_hash = hash;
-  saveConfig('vendor_pin_hash', hash)
-    .then(()=>{ document.getElementById('vendor-pin-new').value=''; showToast('PIN de vendedor guardado'); })
+  db.vendor_pin_plain = pin; // store for display in admin
+  Promise.all([
+    saveConfig('vendor_pin_hash', hash),
+    saveConfig('vendor_pin_plain', pin),
+  ]).then(()=>{ document.getElementById('vendor-pin-new').value=''; renderSellersAdmin(); showToast('PIN de vendedor guardado'); })
     .catch(e=>showToast('Error: '+e.message,'error'));
+}
+function togglePinReveal(){
+  const val = document.getElementById('vendor-pin-value');
+  const link = document.getElementById('vendor-pin-reveal');
+  if(!val||!link) return;
+  if(val.style.display==='none'){
+    val.textContent = db.vendor_pin_plain || '(guardá el PIN de nuevo para verlo)';
+    val.style.display='inline';
+    link.textContent='Ocultar';
+  } else {
+    val.style.display='none';
+    link.textContent='Ver PIN';
+  }
 }
 function saveCompanyWsp(){
   const phone = document.getElementById('company-wsp-inp').value.trim();
@@ -1953,19 +1988,19 @@ function renderCatalog(){
 
   if(totalPages<=1){ paginationEl.style.display='none'; return; }
   paginationEl.style.display='flex';
-  let pages='';
+  const showing_from = serverTotal === 0 ? 0 : (currentPage-1)*PAGE_SIZE + 1;
+  const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
+  let pages=`<div class="pagination-inner">`;
   pages+=`<button class="page-btn page-btn-prev" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Ant.</button>`;
   const range=2;
   for(let i=1;i<=totalPages;i++){
     if(i===1||i===totalPages||Math.abs(i-currentPage)<=range)
       pages+=`<button class="page-btn${i===currentPage?' active':''}" onclick="goPage(${i})">${i}</button>`;
     else if(Math.abs(i-currentPage)===range+1)
-      pages+=`<span class="page-info">…</span>`;
+      pages+=`<span class="page-ellipsis">…</span>`;
   }
   pages+=`<button class="page-btn page-btn-next" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Sig. ›</button>`;
-  const showing_from = serverTotal === 0 ? 0 : (currentPage-1)*PAGE_SIZE + 1;
-  const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
-  pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
+  pages+=`</div><div class="page-counter">${showing_from}–${showing_to} de ${serverTotal}</div>`;
   paginationEl.innerHTML=pages;
   // Reposition FAB above pagination after DOM updates
   setTimeout(()=>updateBadge(), 0);
