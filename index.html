@@ -284,7 +284,7 @@ a{text-decoration:none;color:inherit;}
 /* Stats */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:.85rem;margin-bottom:1.1rem;}
 .stat-card{background:var(--white);border-radius:var(--rlg);padding:1rem;box-shadow:var(--ssm);text-align:center;}
-#fab-cart{position:fixed;bottom:1.5rem;right:1.5rem;z-index:900;display:flex;align-items:center;gap:10px;padding:13px 20px 13px 16px;border-radius:99px;background:var(--gd);color:#fff;font-size:.9rem;font-weight:700;box-shadow:0 4px 18px color-mix(in srgb,var(--gd) 45%,transparent);transition:transform .18s,box-shadow .18s,opacity .18s;border:none;cursor:pointer;}
+#fab-cart{position:fixed;bottom:1.5rem;right:1.5rem;z-index:900;display:flex;align-items:center;gap:10px;padding:13px 20px 13px 16px;border-radius:99px;background:var(--gd);color:#fff;font-size:.9rem;font-weight:700;box-shadow:0 4px 18px color-mix(in srgb,var(--gd) 45%,transparent);transition:transform .18s,box-shadow .18s,opacity .18s,bottom .2s;border:none;cursor:pointer;}
 #fab-cart:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 7px 24px color-mix(in srgb,var(--gd) 55%,transparent);}
 #fab-cart:active{transform:scale(.97);}
 #fab-badge{background:#fff;color:var(--gd);font-size:.72rem;font-weight:800;min-width:20px;height:20px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 5px;}
@@ -1966,6 +1966,8 @@ function renderCatalog(){
   const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
   pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
   paginationEl.innerHTML=pages;
+  // Reposition FAB above pagination
+  requestAnimationFrame(()=>updateBadge());
 }
 
 function renderProductCard(p){
@@ -2133,14 +2135,21 @@ function setQty(id,val){
 }
 function clearCart(){cart=[];saveCart();updateBadge();renderCart();showToast('Carrito vaciado');}
 function updateBadge(){
-  const n=cart.length; // number of distinct products
+  const n=cart.length;
   const b=document.getElementById('cart-badge');
   b.style.display=n>0?'flex':'none'; b.textContent=n>99?'99+':n;
   const fab=document.getElementById('fab-cart');
   const fabBadge=document.getElementById('fab-badge');
   if(fab){
-    fab.style.display=(n>0&&currentView==='catalog')?'flex':'none';
+    const visible = n>0 && currentView==='catalog';
+    fab.style.display = visible ? 'flex' : 'none';
     if(fabBadge) fabBadge.textContent=n>99?'99+':n;
+    if(visible){
+      // Push FAB above pagination bar if it's visible
+      const pag = document.getElementById('pagination');
+      const pagH = (pag && pag.style.display!=='none') ? pag.offsetHeight + 12 : 0;
+      fab.style.bottom = (pagH + 16) + 'px';
+    }
   }
 }
 function renderCart(){
