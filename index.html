@@ -99,16 +99,14 @@ a{text-decoration:none;color:inherit;}
 @media(min-width:480px){.product-grid{grid-template-columns:repeat(2,1fr);gap:.65rem;}}
 @media(min-width:700px){.product-grid{grid-template-columns:repeat(3,1fr);gap:.85rem;}}
 @media(min-width:1024px){.product-grid{grid-template-columns:repeat(4,1fr);gap:1rem;}}
-.product-card{background:var(--white);border-radius:var(--rmd);overflow:hidden;box-shadow:var(--ssm);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;position:relative;}
+.product-card{background:#ffffff;border-radius:var(--rmd);overflow:hidden;box-shadow:0 3px 16px rgba(26,58,42,.22);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;position:relative;}
 .product-card:hover{transform:translateY(-3px);box-shadow:var(--smd);}
 .product-card.out-of-stock .card-img-wrap::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(20,20,20,.52);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:.85rem;font-weight:700;letter-spacing:.05em;}
 .card-img-wrap{position:relative;aspect-ratio:4/3;background:var(--creamd);overflow:hidden;}
 .card-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform .3s;}
 .product-card:hover .card-img-wrap img{transform:scale(1.04);}
 .card-emoji{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;}
-.card-stock-badge{position:absolute;top:5px;right:5px;padding:2px 6px;border-radius:99px;font-size:.6rem;font-weight:600;}
-.badge-avail{background:var(--gl);color:var(--gd);}
-.badge-out{background:var(--redbg);color:var(--red);}
+.product-card:hover{transform:translateY(-3px);box-shadow:var(--smd);}
 .card-body{padding:.55rem .65rem .35rem;flex:1;display:flex;flex-direction:column;gap:.18rem;}
 .card-cat{font-size:.6rem;color:var(--gb);text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
 .card-name{font-family:'Fraunces',serif;font-size:.85rem;font-weight:700;color:var(--td);line-height:1.2;}
@@ -139,6 +137,12 @@ a{text-decoration:none;color:inherit;}
 .page-btn.active{background:var(--gd);color:var(--white);border-color:var(--gd);}
 .page-btn:disabled{opacity:.35;cursor:not-allowed;}
 .page-info{font-size:.78rem;color:var(--tl);padding:0 .25rem;}
+@media(max-width:699px){
+  .pagination{gap:.3rem !important;padding:.75rem .5rem;}
+  .page-btn:not(.page-btn-prev):not(.page-btn-next):not(.active){display:none;}
+  .page-btn-prev,.page-btn-next{flex:1;justify-content:center;}
+  .page-btn.active{min-width:42px;text-align:center;}
+}
 
 /* Empty */
 .empty-state{text-align:center;padding:3.5rem 1rem;color:var(--tl);}
@@ -1966,8 +1970,8 @@ function renderCatalog(){
   const showing_to   = serverTotal === 0 ? 0 : Math.min(currentPage*PAGE_SIZE, serverTotal);
   pages+=`<span class="page-info">${showing_from}–${showing_to} de ${serverTotal}</span>`;
   paginationEl.innerHTML=pages;
-  // Reposition FAB above pagination
-  requestAnimationFrame(()=>updateBadge());
+  // Reposition FAB above pagination after DOM updates
+  setTimeout(()=>updateBadge(), 0);
 }
 
 function renderProductCard(p){
@@ -1977,9 +1981,7 @@ function renderProductCard(p){
   const ci=cart.find(c=>c.id===p.id); const qty=ci?ci.qty:0;
   const tagsHtml=renderTagChips(p.tags||[]);
   return `<div class="product-card${p.inStock?'':' out-of-stock'}" id="card-${p.id}">
-    <div class="card-img-wrap">${imgHtml}
-      <span class="card-stock-badge ${p.inStock?'badge-avail':'badge-out'}">${p.inStock?'\u2713':'\u2717'}</span>
-    </div>
+    <div class="card-img-wrap">${imgHtml}</div>
     <div class="card-body">
       ${p.category?`<div class="card-cat">${esc(p.category)}${p.subcategory?` \u203a ${esc(p.subcategory)}`:''}</div>`:''}
       <div class="card-name">${esc(p.name)}</div>
