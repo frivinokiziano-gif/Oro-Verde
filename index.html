@@ -1654,7 +1654,6 @@ function sendToSeller(idx){
 
 // ── No vendor modal (form → EmailJS) ──
 function openNoVendorModal(){
-  if(!cart.length){ showToast('El carrito está vacío','error'); return; }
   _initEmailJS();
   document.getElementById('nv-error').textContent='';
   document.getElementById('novendor-overlay').classList.add('show');
