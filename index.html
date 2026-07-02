@@ -132,7 +132,8 @@ a{text-decoration:none;color:inherit;}
 .page-btn.active{background:var(--gd);color:var(--white);border-color:var(--gd);}
 .page-btn:disabled{opacity:.35;cursor:not-allowed;}
 .page-btn-prev,.page-btn-next{min-width:70px;}
-.pagination{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1.5rem .5rem .75rem;}
+.pagination{display:flex;flex-direction:row;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:center;padding:.75rem .5rem;}
+#pagination{flex-direction:column;gap:.5rem;padding:1.5rem .5rem .75rem;}
 .pagination-inner{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:center;}
 .page-ellipsis{color:var(--tl);font-size:.85rem;padding:0 4px;line-height:1;}
 .page-counter{font-size:.75rem;color:var(--tl);font-weight:500;}
