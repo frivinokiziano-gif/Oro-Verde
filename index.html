@@ -338,7 +338,9 @@ a{text-decoration:none;color:inherit;}
 /* Subcategory chips */
 .subcat-chips-wrap{max-width:1200px;margin:0 auto;padding:0 1.25rem .6rem;display:none;}
 .subcat-chips-wrap.show{display:flex;gap:.45rem;flex-wrap:wrap;}
-.subcat-chip.active{background:var(--gm);color:var(--white);}
+.subcat-chip{padding:5px 13px;border-radius:99px;border:1.5px solid var(--creamd);background:var(--white);font-size:.78rem;font-weight:500;color:var(--tm);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.subcat-chip:hover{border-color:var(--gm);color:var(--gm);}
+.subcat-chip.active{background:var(--gm);color:var(--white);border-color:var(--gm);}
 /* Cat manager tree */
 .cat-tree{margin-top:.75rem;}
 .cat-tree-item{border:1px solid var(--creamd);border-radius:var(--rmd);margin-bottom:.6rem;overflow:hidden;cursor:default;transition:box-shadow .15s,opacity .15s;}
@@ -1698,8 +1700,9 @@ function renderPromosCarousel(){
   if(!el) return;
   const promos = db.promos||[];
   if(!promos.length){ el.style.display='none'; return; }
-  // Check if user hid promos this session
-  if(sessionStorage.getItem('promos_hidden')==='1'){ el.style.display='none'; return; }
+  // Check if user hid promos recently (expires after 1 hour)
+  const hiddenUntil = localStorage.getItem('promos_hidden_until');
+  if(hiddenUntil && Date.now() < parseInt(hiddenUntil)){ el.style.display='none'; return; }
   el.style.display='block';
   _promoIdx = Math.min(_promoIdx, promos.length-1);
   const p = promos[_promoIdx];
@@ -1725,7 +1728,7 @@ function renderPromosCarousel(){
 }
 
 function hidePromos(){
-  sessionStorage.setItem('promos_hidden','1');
+  localStorage.setItem('promos_hidden_until', Date.now() + 60*60*1000); // 1 hora
   const el = document.getElementById('promos-carousel');
   if(el) el.style.display='none';
 }
