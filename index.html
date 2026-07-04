@@ -144,7 +144,30 @@ a{text-decoration:none;color:inherit;}
   .page-btn-prev,.page-btn-next{min-width:60px;}
 }
 
-/* Empty */
+/* Promos Carousel */
+.promos-wrap{position:relative;margin:.75rem .75rem 0;}
+.promos-wrap-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;padding:0 .1rem;}
+.promos-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tl);}
+.promos-hide-btn{font-size:.7rem;color:var(--tl);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;transition:color .15s;}
+.promos-hide-btn:hover{color:var(--td);}
+.promo-carousel{position:relative;border-radius:var(--rmd);overflow:hidden;background:linear-gradient(135deg,var(--gd) 0%,var(--gm) 100%);box-shadow:0 4px 18px color-mix(in srgb,var(--gm) 35%,transparent);}
+.promo-card{display:flex;align-items:center;gap:1rem;padding:1.1rem 3.2rem;min-height:100px;}
+.promo-img{width:85px;height:85px;object-fit:contain;border-radius:10px;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25));}
+.promo-body{flex:1;}
+.promo-title{font-family:'Fraunces',serif;font-size:1rem;font-weight:700;color:#fff;margin-bottom:.2rem;line-height:1.25;}
+.promo-price{display:inline-block;background:var(--gold);color:var(--gd);font-weight:800;font-size:.92rem;padding:3px 11px;border-radius:20px;margin-bottom:.3rem;font-family:'Fraunces',serif;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+.promo-desc{font-size:.8rem;color:rgba(255,255,255,.85);line-height:1.45;}
+.promo-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);border-radius:50%;width:30px;height:30px;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;z-index:2;color:#fff;backdrop-filter:blur(4px);}
+.promo-arrow:hover{background:rgba(255,255,255,.32);}
+.promo-prev{left:7px;}.promo-next{right:7px;}
+.promo-dots{display:flex;justify-content:center;gap:5px;padding:.55rem 0 .7rem;}
+.promo-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35);transition:background .2s,transform .2s;}
+.promo-dot.active{background:#fff;transform:scale(1.25);}
+@media(max-width:460px){
+  .promo-card{padding:.9rem 2.8rem;gap:.75rem;}
+  .promo-img{width:68px;height:68px;}
+  .promo-title{font-size:.9rem;}
+}
 .empty-state{text-align:center;padding:3.5rem 1rem;color:var(--tl);}
 .empty-state svg{width:52px;height:52px;margin:0 auto 1rem;opacity:.35;}
 
@@ -747,6 +770,7 @@ tr.dragging{opacity:.4;}
 
 <!-- Catalog View -->
 <div class="view active" id="view-catalog">
+  <div id="promos-carousel" style="display:none"></div>
   <div class="product-grid" id="product-grid"></div>
   <div class="pagination" id="pagination" style="display:none"></div>
   <div class="empty-state" id="empty-catalog" style="display:none">
@@ -827,6 +851,7 @@ tr.dragging{opacity:.4;}
     <button class="admin-tab"        id="atab-cats"    onclick="switchAdminTab('cats')">Categorías y tags</button>
     <button class="admin-tab"        id="atab-io"      onclick="switchAdminTab('io')">Importar / Exportar</button>
     <button class="admin-tab"        id="atab-stats"   onclick="switchAdminTab('stats')">Estadísticas</button>
+    <button class="admin-tab"        id="atab-promos"  onclick="switchAdminTab('promos')">Promociones</button>
     <button class="admin-tab"        id="atab-sellers" onclick="switchAdminTab('sellers')">Vendedores</button>
   </div>
 
@@ -1024,6 +1049,38 @@ tr.dragging{opacity:.4;}
   <!-- Panel: stats -->
   <div class="admin-panel" id="apanel-stats">
     <div id="stats-detail"></div>
+  </div>
+
+  <!-- Panel: promos -->
+  <div class="admin-panel" id="apanel-promos">
+    <div class="io-card">
+      <div class="form-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Promociones del carrusel
+      </div>
+      <p class="io-hint">Las promociones aparecen en un carrusel arriba del catálogo. Cada una tiene imagen, texto y precio opcional.</p>
+      <div id="promos-admin-list"></div>
+    </div>
+    <div class="io-card" style="margin-top:1rem;">
+      <div class="form-title">Nueva promoción</div>
+      <div class="form-group">
+        <label class="form-label">Título</label>
+        <input class="form-input" id="promo-title-inp" type="text" placeholder="Ej: ¡Oferta de la semana!">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea class="form-input" id="promo-desc-inp" placeholder="Comprando 10 Magdalenas Pozo te llevás 1 de regalo" style="min-height:70px;resize:vertical;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio destacado (opcional)</label>
+        <input class="form-input" id="promo-price-inp" type="text" placeholder="Ej: $1.410 c/u">
+      </div>
+      <div class="form-group">
+        <label class="form-label">URL de imagen (opcional)</label>
+        <input class="form-input" id="promo-img-inp" type="url" placeholder="https://...">
+      </div>
+      <button class="btn-submit" onclick="addPromo()" style="margin-top:.5rem;">Agregar promoción</button>
+    </div>
   </div>
 
   <!-- Panel: sellers -->
@@ -1252,7 +1309,7 @@ function getEmptyDB(){
     {name:'Limpieza',  subs:[]},
     {name:'Almacén',   subs:[]},
   ], banner:{text:'',bg:'#e9c46a',fg:'#1a3a2a',active:false},
-  sellers:[], vendor_pin_hash:'', company_wsp:'' };
+  sellers:[], vendor_pin_hash:'', company_wsp:'', promos:[] };
 }
 
 // ─── Supabase row ↔ app object mappers ───
@@ -1301,7 +1358,7 @@ async function loadFromSupabase(fullReload=true){
   if(_firstLoad) showPageLoader(true);
   try {
     if(fullReload){
-      const [cats, banner, pinHash, sellers, vendorPin, companyWsp, vendorPinPlain] = await Promise.all([
+      const [cats, banner, pinHash, sellers, vendorPin, companyWsp, vendorPinPlain, promos] = await Promise.all([
         sb.getConfig('categories'),
         sb.getConfig('banner'),
         sb.getConfig('pin_hash'),
@@ -1309,6 +1366,7 @@ async function loadFromSupabase(fullReload=true){
         sb.getConfig('vendor_pin_hash'),
         sb.getConfig('company_wsp'),
         sb.getConfig('vendor_pin_plain'),
+        sb.getConfig('promos'),
       ]);
       if(cats)           db.categories      = cats;
       if(banner)         db.banner          = banner;
@@ -1317,6 +1375,7 @@ async function loadFromSupabase(fullReload=true){
       if(vendorPin)      db.vendor_pin_hash = vendorPin;
       if(companyWsp)     db.company_wsp     = companyWsp;
       if(vendorPinPlain) db.vendor_pin_plain= vendorPinPlain;
+      if(promos)         db.promos          = promos;
     }
 
     // Always load ALL products (bypasses 1000-row limit) — used by admin + stats + search
@@ -1357,11 +1416,13 @@ async function loadFromSupabase(fullReload=true){
     _firstLoad = false;
     renderCatalog();
     applyBanner();
+    renderPromosCarousel();
     updateBadge();
     if(isAdmin) renderAdmin();
   } else {
     renderCatalog();
     applyBanner();
+    renderPromosCarousel();
     if(currentView==='admin') renderAdmin();
   }
 
@@ -1628,8 +1689,104 @@ function saveBanner(){
     .catch(e=>showToast('Error: '+e.message,'error'));
 }
 // ═══════════════════════════════════════════
-//  SELLERS & VENDOR
+//  PROMOS CAROUSEL
 // ═══════════════════════════════════════════
+let _promoIdx = 0;
+
+function renderPromosCarousel(){
+  const el = document.getElementById('promos-carousel');
+  if(!el) return;
+  const promos = db.promos||[];
+  if(!promos.length){ el.style.display='none'; return; }
+  // Check if user hid promos this session
+  if(sessionStorage.getItem('promos_hidden')==='1'){ el.style.display='none'; return; }
+  el.style.display='block';
+  _promoIdx = Math.min(_promoIdx, promos.length-1);
+  const p = promos[_promoIdx];
+  el.innerHTML=`<div class="promos-wrap">
+    <div class="promos-wrap-header">
+      <span class="promos-label">🏷 Promociones</span>
+      <button class="promos-hide-btn" onclick="hidePromos()">Ocultar ✕</button>
+    </div>
+    <div class="promo-carousel">
+      ${promos.length>1?`<button class="promo-arrow promo-prev" onclick="promoNav(-1)">&#8592;</button>`:''}
+      <div class="promo-card">
+        ${p.img?`<img class="promo-img" src="${esc(p.img)}" alt="${esc(p.title||'')}" loading="lazy">`:''}
+        <div class="promo-body">
+          ${p.title?`<div class="promo-title">${esc(p.title)}</div>`:''}
+          ${p.price?`<div class="promo-price">${esc(p.price)}</div>`:''}
+          ${p.desc?`<div class="promo-desc">${esc(p.desc)}</div>`:''}
+        </div>
+      </div>
+      ${promos.length>1?`<button class="promo-arrow promo-next" onclick="promoNav(1)">&#8594;</button>`:''}
+      ${promos.length>1?`<div class="promo-dots">${promos.map((_,i)=>`<span class="promo-dot${i===_promoIdx?' active':''}"></span>`).join('')}</div>`:''}
+    </div>
+  </div>`;
+}
+
+function hidePromos(){
+  sessionStorage.setItem('promos_hidden','1');
+  const el = document.getElementById('promos-carousel');
+  if(el) el.style.display='none';
+}
+
+function promoNav(dir){
+  const promos = db.promos||[];
+  _promoIdx = (_promoIdx + dir + promos.length) % promos.length;
+  renderPromosCarousel();
+}
+
+function renderPromosAdmin(){
+  const el = document.getElementById('promos-admin-list');
+  const promos = db.promos||[];
+  if(!promos.length){ el.innerHTML='<p class="io-hint">No hay promociones todavía.</p>'; return; }
+  el.innerHTML = promos.map((p,i)=>`
+    <div class="seller-admin-row" style="align-items:flex-start;gap:.75rem;">
+      ${p.img?`<img src="${esc(p.img)}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy">`:'<div style="width:52px;height:52px;border-radius:8px;background:var(--creamd);flex-shrink:0;"></div>'}
+      <div style="flex:1;min-width:0;">
+        <div class="seller-admin-name">${esc(p.title||'Sin título')}</div>
+        ${p.price?`<div style="font-size:.78rem;font-weight:700;color:var(--gd);">${esc(p.price)}</div>`:''}
+        <div class="seller-admin-phone">${esc((p.desc||'').slice(0,60))}${(p.desc||'').length>60?'...':''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;">
+        <button class="seller-admin-del" onclick="movePromo(${i},-1)" title="Subir" ${i===0?'disabled':''}>↑</button>
+        <button class="seller-admin-del" onclick="movePromo(${i},1)" title="Bajar" ${i===promos.length-1?'disabled':''}>↓</button>
+        <button class="seller-admin-del" onclick="deletePromo(${i})" title="Eliminar" style="color:var(--red);">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function addPromo(){
+  const title = document.getElementById('promo-title-inp').value.trim();
+  const desc  = document.getElementById('promo-desc-inp').value.trim();
+  const price = document.getElementById('promo-price-inp').value.trim();
+  const img   = document.getElementById('promo-img-inp').value.trim();
+  if(!title&&!desc){ showToast('Escribí al menos un título o descripción','error'); return; }
+  if(!db.promos) db.promos=[];
+  db.promos.push({title, desc, price, img});
+  saveConfig('promos', db.promos).then(()=>{
+    ['promo-title-inp','promo-desc-inp','promo-price-inp','promo-img-inp'].forEach(id=>document.getElementById(id).value='');
+    renderPromosAdmin(); renderPromosCarousel();
+    showToast('Promoción agregada');
+  }).catch(e=>showToast('Error: '+e.message,'error'));
+}
+
+function deletePromo(idx){
+  db.promos.splice(idx,1);
+  saveConfig('promos', db.promos).then(()=>{ renderPromosAdmin(); renderPromosCarousel(); showToast('Promoción eliminada'); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+
+function movePromo(idx, dir){
+  const promos = db.promos;
+  const newIdx = idx+dir;
+  if(newIdx<0||newIdx>=promos.length) return;
+  [promos[idx], promos[newIdx]] = [promos[newIdx], promos[idx]];
+  saveConfig('promos', db.promos).then(()=>{ renderPromosAdmin(); renderPromosCarousel(); })
+    .catch(e=>showToast('Error: '+e.message,'error'));
+}
+
+
 
 // ── Seller modal (choose seller → WhatsApp) ──
 function openSellerModal(){
@@ -2303,6 +2460,7 @@ function switchAdminTab(tab){
   if(tab==='list')    generateQR();
   if(tab==='stats')   renderStatsDetail();
   if(tab==='sellers') renderSellersAdmin();
+  if(tab==='promos')  renderPromosAdmin();
 }
 
 function renderStatsDetail(){
