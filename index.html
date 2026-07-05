@@ -145,11 +145,11 @@ a{text-decoration:none;color:inherit;}
 }
 
 /* Promos Carousel */
-.promos-wrap{position:relative;margin:.75rem .75rem 0;}
-.promos-wrap-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;padding:0 .1rem;}
-.promos-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tl);}
-.promos-hide-btn{font-size:.7rem;color:var(--tl);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;transition:color .15s;}
-.promos-hide-btn:hover{color:var(--td);}
+.promos-wrap{position:relative;margin:.1rem .75rem 1.5rem;}
+.promos-wrap-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;padding:0 .1rem;}
+.promos-label{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--white);background:var(--gd);padding:5px 12px;border-radius:99px;display:flex;align-items:center;gap:4px;}
+.promos-hide-btn{font-size:.78rem;font-weight:700;color:var(--white);background:rgba(26,58,42,.55);border:none;cursor:pointer;padding:5px 14px;border-radius:99px;transition:background .15s;display:flex;align-items:center;gap:4px;}
+.promos-hide-btn:hover{background:rgba(26,58,42,.85);}
 .promo-carousel{position:relative;border-radius:var(--rmd);overflow:hidden;background:linear-gradient(135deg,var(--gd) 0%,var(--gm) 100%);box-shadow:0 4px 18px color-mix(in srgb,var(--gm) 35%,transparent);}
 .promo-card{display:flex;align-items:center;gap:1rem;padding:1.1rem 3.2rem;min-height:100px;}
 .promo-img{width:85px;height:85px;object-fit:contain;border-radius:10px;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25));}
@@ -1694,6 +1694,17 @@ function saveBanner(){
 //  PROMOS CAROUSEL
 // ═══════════════════════════════════════════
 let _promoIdx = 0;
+let _promoTimer = null;
+
+function _startPromoTimer(){
+  clearInterval(_promoTimer);
+  const promos = db.promos||[];
+  if(promos.length <= 1) return;
+  _promoTimer = setInterval(()=>{
+    _promoIdx = (_promoIdx + 1) % promos.length;
+    renderPromosCarousel();
+  }, 4000);
+}
 
 function renderPromosCarousel(){
   const el = document.getElementById('promos-carousel');
@@ -1708,8 +1719,8 @@ function renderPromosCarousel(){
   const p = promos[_promoIdx];
   el.innerHTML=`<div class="promos-wrap">
     <div class="promos-wrap-header">
-      <span class="promos-label">🏷 Promociones</span>
-      <button class="promos-hide-btn" onclick="hidePromos()">Ocultar ✕</button>
+      <span class="promos-label">🏷️ Promociones</span>
+      <button class="promos-hide-btn" onclick="hidePromos()">✕ Ocultar</button>
     </div>
     <div class="promo-carousel">
       ${promos.length>1?`<button class="promo-arrow promo-prev" onclick="promoNav(-1)">&#8592;</button>`:''}
@@ -1725,10 +1736,12 @@ function renderPromosCarousel(){
       ${promos.length>1?`<div class="promo-dots">${promos.map((_,i)=>`<span class="promo-dot${i===_promoIdx?' active':''}"></span>`).join('')}</div>`:''}
     </div>
   </div>`;
+  _startPromoTimer();
 }
 
 function hidePromos(){
-  localStorage.setItem('promos_hidden_until', Date.now() + 60*60*1000); // 1 hora
+  clearInterval(_promoTimer);
+  localStorage.setItem('promos_hidden_until', Date.now() + 60*60*1000);
   const el = document.getElementById('promos-carousel');
   if(el) el.style.display='none';
 }
@@ -1736,7 +1749,7 @@ function hidePromos(){
 function promoNav(dir){
   const promos = db.promos||[];
   _promoIdx = (_promoIdx + dir + promos.length) % promos.length;
-  renderPromosCarousel();
+  renderPromosCarousel(); // resets timer
 }
 
 function renderPromosAdmin(){
