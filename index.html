@@ -1079,7 +1079,7 @@ tr.dragging{opacity:.4;}
       </div>
       <div class="form-group">
         <label class="form-label">URL de imagen (opcional)</label>
-        <input class="form-input" id="promo-img-inp" type="url" placeholder="https://...">
+        <input class="form-input" id="promo-img-inp" type="url" placeholder="https://... o link de Google Drive">
       </div>
       <button class="btn-submit" onclick="addPromo()" style="margin-top:.5rem;">Agregar promoción</button>
     </div>
@@ -1772,11 +1772,18 @@ function renderPromosAdmin(){
     </div>`).join('');
 }
 
+function normalizeDriveUrl(url){
+  if(!url) return url;
+  const m = url.match(/(?:\/file\/d\/|[?&]id=|\/d\/)([a-zA-Z0-9_-]{20,})/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  return url;
+}
+
 function addPromo(){
   const title = document.getElementById('promo-title-inp').value.trim();
   const desc  = document.getElementById('promo-desc-inp').value.trim();
   const price = document.getElementById('promo-price-inp').value.trim();
-  const img   = document.getElementById('promo-img-inp').value.trim();
+  const img   = normalizeDriveUrl(document.getElementById('promo-img-inp').value.trim());
   if(!title&&!desc){ showToast('Escribí al menos un título o descripción','error'); return; }
   if(!db.promos) db.promos=[];
   db.promos.push({title, desc, price, img});
