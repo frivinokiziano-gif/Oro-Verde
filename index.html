@@ -1773,6 +1773,8 @@ function renderPromosAdmin(){
 }
 
 function normalizeDriveUrl(url){
+  // Usa la misma lógica que ya funciona en "agregar producto" (evita problemas de CORS)
+  if(typeof normalizeImgUrl==='function') return normalizeImgUrl(url);
   if(!url) return url;
   const m = url.match(/(?:\/file\/d\/|[?&]id=|\/d\/)([a-zA-Z0-9_-]{20,})/);
   if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
