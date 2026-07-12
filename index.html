@@ -192,6 +192,16 @@ a{text-decoration:none;color:inherit;}
 .cart-notes-input:focus{border-color:var(--gm);background:var(--white);}
 .cart-summary{background:var(--white);border-radius:var(--rlg);padding:1.1rem;box-shadow:var(--ssm);align-self:start;position:sticky;top:70px;}
 .summary-title{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:700;margin-bottom:.9rem;}
+.summary-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:none;border:none;cursor:pointer;padding:.1rem 0 .8rem;font-size:1rem;font-family:'Fraunces',serif;font-weight:700;color:var(--td);}
+.summary-toggle svg{flex-shrink:0;transition:transform .25s;}
+.summary-toggle.open svg{transform:rotate(180deg);}
+.summary-collapsible{overflow:hidden;transition:max-height .3s ease;max-height:0;}
+.summary-collapsible.open{max-height:1000px;}
+@media(min-width:768px){
+  .summary-collapsible{max-height:none !important;}
+  .summary-toggle svg{display:none;}
+  .summary-toggle{cursor:default;padding-bottom:.8rem;}
+}
 .summary-row{display:flex;justify-content:space-between;font-size:.845rem;padding:.3rem 0;}
 .summary-row.total{border-top:2px solid var(--creamd);margin-top:.4rem;padding-top:.65rem;font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;color:var(--gd);}
 .disclaimer{background:#fff7e6;border:2px solid #f4a523;border-radius:var(--rmd);padding:.85rem 1rem;font-size:.82rem;color:#7a4a00;margin:.9rem 0;line-height:1.55;display:flex;gap:.65rem;align-items:flex-start;}
@@ -799,15 +809,21 @@ tr.dragging{opacity:.4;}
       </div>
     </div>
     <div class="cart-summary">
-      <div class="summary-title">Resumen</div>
-      <div id="summary-rows"></div>
-      <div class="summary-row total">
-        <span>Total estimado</span>
-        <span id="cart-total">$0</span>
-      </div>
-      <div class="disclaimer">
-        <span class="disclaimer-icon">⚠️</span>
-        <div class="disclaimer-body"><strong>Aviso importante</strong>El total es estimado y puede variar por cambios de precio o stock desactualizado.</div>
+      <button class="summary-toggle" onclick="toggleSummary()" id="summary-toggle-btn">
+        <span>Resumen</span>
+        <span id="summary-toggle-total" style="font-family:'Fraunces',serif;font-weight:700;color:var(--gd);"></span>
+        <svg id="summary-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="summary-collapsible" class="summary-collapsible">
+        <div id="summary-rows"></div>
+        <div class="summary-row total">
+          <span>Total estimado</span>
+          <span id="cart-total">$0</span>
+        </div>
+        <div class="disclaimer">
+          <span class="disclaimer-icon">⚠️</span>
+          <div class="disclaimer-body"><strong>Aviso importante</strong>El total es estimado y puede variar por cambios de precio o stock desactualizado.</div>
+        </div>
       </div>
       <button class="btn-copy-order" onclick="openCopyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -2380,6 +2396,13 @@ function updateBadge(){
     fab.style.bottom='16px'; // default, scroll listener adjusts if needed
   }
 }
+function toggleSummary(){
+  const col=document.getElementById('summary-collapsible');
+  const btn=document.getElementById('summary-toggle-btn');
+  if(!col||!btn) return;
+  const open=col.classList.toggle('open');
+  btn.classList.toggle('open',open);
+}
 function renderCart(){
   const list=document.getElementById('cart-list');
   const empty=document.getElementById('empty-cart');
@@ -2418,6 +2441,8 @@ function renderCart(){
   }).join('');
   rows.innerHTML=rowsHtml;
   document.getElementById('cart-total').textContent='$'+fmt(total);
+  const tt=document.getElementById('summary-toggle-total');
+  if(tt) tt.textContent='$'+fmt(total);
 }
 
 // Texto limpio para copiar — sin aviso
