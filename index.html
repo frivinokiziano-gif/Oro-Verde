@@ -2383,7 +2383,14 @@ function setQty(id,val){
   if(!_updateCardFooter(id)) renderCatalog();
   if(currentView==='cart') renderCart();
 }
-function clearCart(){cart=[];saveCart();updateBadge();renderCart();showToast('Carrito vaciado');}
+function clearCart(){
+  cart=[];saveCart();updateBadge();renderCart();
+  const n=document.getElementById('cart-client-name');
+  const t=document.getElementById('cart-notes');
+  if(n) n.value='';
+  if(t) t.value='';
+  showToast('Carrito vaciado');
+}
 function updateBadge(){
   const n=cart.length;
   const b=document.getElementById('cart-badge');
@@ -2449,15 +2456,15 @@ function renderCart(){
 function buildOrderText(){
   const _pool3=_allProducts.length>0?_allProducts:db.products;
   const name=(document.getElementById('cart-client-name')?.value||'').trim();
-  const lines=['🛒 PEDIDO - Distribuidora Oro Verde'];
-  if(name) lines.push('👤 Cliente: '+name);
+  const lines=['PEDIDO - Distribuidora Oro Verde'];
+  if(name) lines.push('Cliente: '+name);
   lines.push('');
   cart.forEach(item=>{const p=_pool3.find(x=>x.id===item.id);if(p)lines.push('*'+item.qty+'*- '+p.name);});
   const total=cart.reduce((s,x)=>{const p=_pool3.find(q=>q.id===x.id);return s+(p?p.price*x.qty:0);},0);
   const notes=(document.getElementById('cart-notes').value||'').trim();
   lines.push('');
   lines.push('Total estimado: $'+fmt(total));
-  if(notes){ lines.push(''); lines.push('📝 Notas: '+notes); }
+  if(notes){ lines.push(''); lines.push('Notas: '+notes); }
   return lines.join('\n');
 }
 function openCopyModal(){
