@@ -113,12 +113,17 @@ a{text-decoration:none;color:inherit;}
 .card-desc{font-size:.7rem;color:var(--tl);line-height:1.4;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .card-tags{margin-top:.15rem;}
 .card-price{font-family:'Fraunces',serif;font-size:1.25rem;font-weight:800;color:var(--gd);margin-top:.25rem;letter-spacing:-.01em;}
-.card-footer{padding:.3rem .65rem .6rem;display:flex;gap:.35rem;}
+.card-footer{padding:.3rem .65rem .6rem;display:flex;flex-wrap:wrap;gap:.35rem;}
 .btn-add-cart{flex:1;padding:6px 5px;border-radius:var(--rsm);background:var(--gd);color:var(--white);font-size:.72rem;font-weight:600;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:3px;}
 .btn-add-cart:hover:not(:disabled){background:var(--gm);}
 .btn-add-cart:active{transform:scale(.97);}
 .btn-add-cart:disabled{background:var(--creamd);color:var(--tl);cursor:not-allowed;}
+.btn-add-bulk{width:100%;padding:5px 5px;border-radius:var(--rsm);background:var(--creamd);color:var(--gd);border:1px solid var(--gd);font-size:.68rem;font-weight:600;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:3px;}
+.btn-add-bulk:hover:not(:disabled){background:var(--gd);color:var(--white);}
+.btn-add-bulk:active{transform:scale(.97);}
+.btn-add-bulk:disabled{opacity:.5;cursor:not-allowed;}
 .qty-ctrl{display:flex;align-items:center;gap:.4rem;margin-top:.35rem;}
+.qty-case-note{width:100%;text-align:center;font-size:.66rem;line-height:1.35;color:var(--tl);margin-top:.15rem;}
 .qty-btn{width:26px;height:26px;border-radius:6px;background:var(--creamd);color:var(--td);font-size:1rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:background .12s;}
 .qty-btn:hover{background:var(--gl);}
 .qty-val{width:42px;text-align:center;font-size:.875rem;font-weight:600;padding:3px 4px;border-radius:var(--rsm);border:1.5px solid var(--creamd);background:var(--white);-moz-appearance:textfield;appearance:textfield;}.qty-val:focus{border-color:var(--gm);outline:none;}.qty-val::-webkit-inner-spin-button,.qty-val::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
@@ -183,6 +188,7 @@ a{text-decoration:none;color:inherit;}
 .cart-item-info{flex:1;min-width:0;}
 .cart-item-name{font-weight:600;font-size:.84rem;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .cart-item-price{font-size:.74rem;color:var(--tl);}
+.cart-item-info .qty-case-note{text-align:left;margin-top:.3rem;}
 .cart-item-sub{font-family:'Fraunces',serif;font-weight:700;color:var(--gd);font-size:.9rem;flex-shrink:0;}
 .cart-remove{width:26px;height:26px;border-radius:6px;background:var(--redbg);color:var(--red);font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s;}
 .cart-remove:hover{background:#ffd6d6;}
@@ -938,6 +944,10 @@ tr.dragging{opacity:.4;}
         <label class="form-label">Precio *</label>
         <input class="form-input" id="f-price" type="number" min="0" step="0.01" placeholder="0.00">
       </div>
+      <div class="form-group">
+        <label class="form-label">Unidades por bulto</label>
+        <input class="form-input" id="f-units-per-case" type="number" min="1" step="1" placeholder="Ej: 12 (dejar vacío si no aplica)">
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Categoría</label>
@@ -1345,6 +1355,7 @@ function rowToProduct(r){
     visible:      r.visible !== false,  // normalize: undefined/null/true → true
     tags:         r.tags||[],
     order:        r.sort_order||0,
+    unitsPerCase: r.units_per_case!=null ? Number(r.units_per_case) : null,
   };
 }
 function productToRow(p){
@@ -1361,6 +1372,7 @@ function productToRow(p){
     visible:       p.visible,
     tags:          p.tags||[],
     sort_order:    p.order||0,
+    units_per_case: p.unitsPerCase!=null ? p.unitsPerCase : null,
   };
 }
 
@@ -2216,6 +2228,12 @@ function renderCatalog(){
   }
 }
 
+function bulkButtonHtml(p){
+  if(!p || !(p.unitsPerCase>0)) return '';
+  return `<button class="btn-add-bulk" onclick="addBulkToCart('${p.id}')" ${p.inStock?'':'disabled'}>
+    \u{1F4E6} +${p.unitsPerCase}
+  </button>`;
+}
 function renderProductCard(p){
   const imgHtml=p.imgUrl
     ?`<img src="${esc(p.imgUrl)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-emoji" style="display:none">${p.emoji||'\u{1F4E6}'}</div>`
@@ -2240,12 +2258,13 @@ function renderProductCard(p){
               onfocus="this.select()">
             <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
             <button class="cart-remove-sm" onclick="removeFromCart('${p.id}')">\u2715</button>
-          </div>`
+          </div>${caseNoteHtml(qty,p)}`
         :`<button class="btn-add-cart" onclick="addToCart('${p.id}')" ${p.inStock?'':'disabled'}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
             ${p.inStock?'Agregar':'Agotado'}
           </button>`
       }
+      ${bulkButtonHtml(p)}
     </div>
   </div>`;
 }
@@ -2310,32 +2329,75 @@ function setSubcat(s){
 // ═══════════════════════════════════════════
 //  CART
 // ═══════════════════════════════════════════
+// Pure helper: breaks a quantity into full cases + loose units for a given
+// case size. Reusable anywhere qty/unitsPerCase need to be displayed or
+// priced (cart, card footer, future per-case promotions) without touching
+// cart state, the DOM, or any UI function.
+function getCaseInfo(qty, unitsPerCase){
+  const q=Math.max(0, Math.floor(Number(qty)||0));
+  const u=Number(unitsPerCase);
+  if(!(u>0)) return { cases:0, remainder:q, isFullCase:false, unitsPerCase:null };
+  const cases=Math.floor(q/u);
+  const remainder=q-cases*u;
+  return { cases, remainder, isFullCase: cases>0 && remainder===0, unitsPerCase:u };
+}
+// Pure text formatter: turns a getCaseInfo() result into a short phrase.
+// No DOM, no HTML, no cart access — just text.
+// - 1+ full cases  -> "N bultos" or "N bultos + M unidades"
+// - below one case -> "M de U unidades para completar 1 bulto" (progress
+//   toward the next case — useful ahead of future per-case promotions)
+// - no unitsPerCase, or qty 0 -> '' (nothing to show)
+function formatCaseInfo(info){
+  if(!info || !(info.unitsPerCase>0)) return '';
+  if(info.cases>0){
+    const caseTxt=info.cases+' bulto'+(info.cases===1?'':'s');
+    return info.remainder>0 ? caseTxt+' + '+info.remainder+' unidad'+(info.remainder===1?'':'es') : caseTxt;
+  }
+  if(info.remainder>0) return info.remainder+' de '+info.unitsPerCase+' unidades para completar 1 bulto';
+  return '';
+}
+// Render-layer helper (same role as bulkButtonHtml): consumes getCaseInfo()
+// + formatCaseInfo() and produces the small note shown under the qty
+// stepper. Kept in one place so the markup isn't duplicated across its three
+// call sites (renderProductCard, _updateCardFooter, renderCart). Decides
+// layout only (whether to prefix with the total qty) — the wording itself
+// comes from formatCaseInfo.
+function caseNoteHtml(qty, p){
+  if(!p || !(p.unitsPerCase>0)) return '';
+  const info=getCaseInfo(qty, p.unitsPerCase);
+  const txt=formatCaseInfo(info);
+  if(!txt) return '';
+  const line=info.cases>0 ? `${qty} unidad${qty===1?'':'es'}<br>(${txt})` : txt;
+  return `<div class="qty-case-note">${line}</div>`;
+}
+function _addQtyToCart(id,qty){
+  const ex=cart.find(x=>x.id===id);
+  if(ex) ex.qty+=qty; else cart.push({id,qty});
+}
+function _pulseCard(id){
+  const card=document.getElementById(`card-${id}`);
+  if(!card) return;
+  card.classList.remove('card-added');
+  void card.offsetWidth;
+  card.classList.add('card-added');
+  setTimeout(()=>card.classList.remove('card-added'), 400);
+}
 function addToCart(id){
   const _pool=_allProducts.length>0?_allProducts:db.products;
   const p=_pool.find(x=>x.id===id); if(!p||!p.inStock) return;
-  const ex=cart.find(x=>x.id===id);
-  if(ex) ex.qty++; else cart.push({id,qty:1});
+  _addQtyToCart(id,1);
   saveCart(); updateBadge();
-  // Update only the footer of this card — no full re-render needed
-  const card=document.getElementById(`card-${id}`);
-  if(card){
-    const qty=cart.find(x=>x.id===id)?.qty||0;
-    const footer=card.querySelector('.card-footer');
-    if(footer) footer.innerHTML=`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
-      <button class="qty-btn" onclick="changeQty('${id}',-1)">−</button>
-      <input type="number" class="qty-val" value="${qty}" min="1"
-        onchange="setQty('${id}',this.value)" onfocus="this.select()">
-      <button class="qty-btn" onclick="changeQty('${id}',1)">+</button>
-      <button class="cart-remove-sm" onclick="removeFromCart('${id}')">✕</button>
-    </div>`;
-    card.classList.remove('card-added');
-    void card.offsetWidth;
-    card.classList.add('card-added');
-    setTimeout(()=>card.classList.remove('card-added'), 400);
-  } else {
-    renderCatalog(); // fallback if card not in DOM
-  }
+  if(_updateCardFooter(id)) _pulseCard(id); else renderCatalog(); // fallback if card not in DOM
   showToast(p.name+' agregado');
+}
+
+function addBulkToCart(id){
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id); if(!p||!p.inStock||!(p.unitsPerCase>0)) return;
+  _addQtyToCart(id,p.unitsPerCase);
+  saveCart(); updateBadge();
+  if(_updateCardFooter(id)) _pulseCard(id); else renderCatalog();
+  showToast(p.name+' agregado (+'+p.unitsPerCase+')');
 }
 
 function _updateCardFooter(id){
@@ -2344,6 +2406,8 @@ function _updateCardFooter(id){
   const qty=cart.find(x=>x.id===id)?.qty||0;
   const footer=card.querySelector('.card-footer');
   if(!footer) return false;
+  const _pool=_allProducts.length>0?_allProducts:db.products;
+  const p=_pool.find(x=>x.id===id);
   if(qty>0){
     footer.innerHTML=`<div class="qty-ctrl" style="width:100%;justify-content:center;gap:.4rem;">
       <button class="qty-btn" onclick="changeQty('${id}',-1)">−</button>
@@ -2351,13 +2415,11 @@ function _updateCardFooter(id){
         onchange="setQty('${id}',this.value)" onfocus="this.select()">
       <button class="qty-btn" onclick="changeQty('${id}',1)">+</button>
       <button class="cart-remove-sm" onclick="removeFromCart('${id}')">✕</button>
-    </div>`;
+    </div>${caseNoteHtml(qty,p)}${bulkButtonHtml(p)}`;
   } else {
-    const _pool=_allProducts.length>0?_allProducts:db.products;
-    const p=_pool.find(x=>x.id===id);
     footer.innerHTML=`<button class="btn-add-cart" onclick="addToCart('${id}')" ${p&&p.inStock?'':'disabled'}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar
-    </button>`;
+    </button>${bulkButtonHtml(p)}`;
   }
   return true;
 }
@@ -2441,6 +2503,7 @@ function renderCart(){
             onclick="this.select()">
           <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
         </div>
+        ${caseNoteHtml(item.qty,p)}
       </div>
       <div class="cart-item-sub">$${fmt(sub)}</div>
       <button class="cart-remove" onclick="removeFromCart('${p.id}')">✕</button>
@@ -3134,6 +3197,17 @@ function submitProduct(){
   if(!name)              {showToast('El nombre es obligatorio','error');return;}
   if(isNaN(price)||price<0){showToast('Precio inválido','error');return;}
 
+  const unitsPerCaseRaw=document.getElementById('f-units-per-case').value.trim();
+  let unitsPerCase=null;
+  if(unitsPerCaseRaw!==''){
+    const n=Number(unitsPerCaseRaw);
+    if(!Number.isInteger(n)||n<=0){
+      showToast('Unidades por bulto debe ser un número entero mayor que cero','error');
+      return;
+    }
+    unitsPerCase=n;
+  }
+
   const editId=document.getElementById('f-edit-id').value;
   const tagsRaw=document.getElementById('f-tags').value;
   const tags=tagsRaw.split(',').map(t=>t.trim()).filter(Boolean);
@@ -3148,6 +3222,7 @@ function submitProduct(){
     imgUrl:      normalizeImgUrl(document.getElementById('f-img-url').value.trim()),
     inStock:     document.getElementById('f-stock').checked,
     visible:     document.getElementById('f-visible').checked,
+    unitsPerCase,
   };
 
   if(editId){
@@ -3178,6 +3253,7 @@ function editProduct(id){
   const p=_pool.find(x=>x.id===id); if(!p) return;
   document.getElementById('f-name').value    =p.name;
   document.getElementById('f-price').value   =p.price;
+  document.getElementById('f-units-per-case').value=(p.unitsPerCase!=null?p.unitsPerCase:'');
   document.getElementById('f-desc').value    =p.desc||'';
   document.getElementById('f-tags').value    =(p.tags||[]).join(', ');
   document.getElementById('f-emoji').value   =p.emoji||'';
@@ -3205,7 +3281,7 @@ function cancelEdit(){
 }
 
 function clearForm(){
-  ['f-name','f-price','f-desc','f-tags','f-emoji','f-img-url','f-edit-id'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-price','f-units-per-case','f-desc','f-tags','f-emoji','f-img-url','f-edit-id'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stock').checked=true;
   document.getElementById('f-visible').checked=true;
   document.getElementById('img-preview').style.display='none';
@@ -3364,11 +3440,11 @@ function exportJSON(){
 }
 
 function exportCSV(){
-  const cols=['nombre','precio','categoria','descripcion','emoji','stock','visible','tags'];
+  const cols=['nombre','precio','categoria','descripcion','emoji','stock','visible','tags','units_per_case'];
   const rows=(_allProducts.length>0?_allProducts:db.products).map(p=>[
     csvCell(p.name), p.price, csvCell(p.category||''), csvCell(p.desc||''),
     csvCell(p.emoji||''), p.inStock?1:0, p.visible!==false?1:0,
-    csvCell((p.tags||[]).join(';'))
+    csvCell((p.tags||[]).join(';')), p.unitsPerCase!=null?p.unitsPerCase:''
   ].join(','));
   const csv=[cols.join(','),...rows].join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
@@ -3436,6 +3512,7 @@ function importCSV(inp){
         visible:     ['visible','activo','active','mostrar'],
         tags:        ['tags','etiquetas','palabras'],
         imgUrl:      ['imagen','image','img','foto','url'],
+        unitsPerCase:['unitspercase','unidadesporbulto','cantidadporbulto','bulto','unidadesbulto'],
       };
 
       // Map each field to its column index
@@ -3466,6 +3543,13 @@ function importCSV(inp){
           }
         }
 
+        // unitsPerCase: same validation as the admin form (integer > 0, else
+        // null) — missing/unknown column, empty cell, or invalid value all
+        // fall back to null so old CSVs without this column keep working.
+        const upcRaw = col(cols,'unitsPerCase');
+        const upcNum = upcRaw!=='' ? Number(upcRaw) : NaN;
+        const unitsPerCase = Number.isInteger(upcNum) && upcNum>0 ? upcNum : null;
+
         return {
           id:       'imp'+Date.now()+i,
           name:     col(cols,'nombre','Producto'),
@@ -3478,6 +3562,7 @@ function importCSV(inp){
           visible:  col(cols,'visible','1')!=='0',
           tags:     tagsRaw.split(/[;|]/).map(t=>t.trim()).filter(Boolean),
           imgUrl:   col(cols,'imgUrl'),
+          unitsPerCase,
           order:    (_allProducts.length>0?_allProducts:db.products).length+i,
         };
       }).filter(Boolean);
